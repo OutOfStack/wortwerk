@@ -90,6 +90,29 @@ stale progress revisions and persistent rate limits.
 Deployment deliberately stops until a real database ID is configured. No
 Cloudflare billing plan is enabled or upgraded by these scripts.
 
+### Cloudflare GitHub integration (Workers Builds)
+
+When Cloudflare is connected directly to this repository, its build service
+handles deployment authentication. No GitHub Actions secrets are required.
+
+Create a D1 database named `wortwerk` in your Cloudflare account and replace the
+placeholder `database_id` in `wrangler.jsonc` with its ID. Keep the binding name
+`DB`. Database bindings are declared only in `wrangler.jsonc`: the Vite plugin
+merges arrays, so repeating the binding in `vite.config.ts` creates duplicates.
+
+Use these build settings:
+
+- Build command: `pnpm build`
+- Deploy command: `pnpm exec wrangler d1 migrations apply DB --remote --config wrangler.jsonc && pnpm exec wrangler deploy`
+- Root directory: the repository root
+- Production branch: `main`
+
+Migrations run before the Worker is deployed. The explicit root configuration
+on the migration command makes its `drizzle` directory resolve correctly;
+the deployment command uses the Vite-generated Worker configuration.
+The build token also needs permission to modify D1 if the generated token does
+not already include it.
+
 Cloudflare's free CPU allowance is small (10 ms per request). Secure password
 hashing is CPU-intensive, so free-tier login feasibility must be measured on
 deployment; the local emulator does not enforce production CPU billing limits.
