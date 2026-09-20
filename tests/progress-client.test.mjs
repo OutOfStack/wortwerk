@@ -9,6 +9,42 @@ const user = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', email: 'alice@example
 const response = (body, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
 const settle = () => new Promise(resolve => setImmediate(resolve));
 
+test('eight correct recalls retire a word, incorrect and duplicate answers do not advance it', async () => {
+  const app = boot(async () => response({ user: null }));
+  await settle();
+  app.evaluate('state=structuredClone(defaultState)');
+  const prepare = "session={type:'words',pool:[WORDS[2]],items:[WORDS[2]],index:0,roundCorrect:0,current:{kind:'type',answer:WORDS[2].de,word:WORDS[2]}}";
+  for (let i=0;i<7;i++) {
+    app.evaluate(prepare + ";answer('KASE');answer('KASE')");
+    assert.equal(app.evaluate('wordCorrect(WORDS[2])'), i+1);
+  }
+  assert.equal(app.evaluate('pendingWords([WORDS[2]]).length'), 1);
+  app.evaluate(prepare + ";answer('Brot')");
+  assert.equal(app.evaluate('wordCorrect(WORDS[2])'), 7);
+  app.evaluate(prepare + ";answer('kaese')");
+  assert.equal(app.evaluate('wordCorrect(WORDS[2])'), 8);
+  assert.equal(app.evaluate('pendingWords([WORDS[2]]).length'), 0);
+  assert.equal(JSON.parse(app.storage.get('wortwerk-guest-progress')).wordCorrectCounts['2'], 8);
+  assert.match(app.elements.get('#feedback').innerHTML, /Learned!/);
+  app.evaluate('startWords([WORDS[2]])');
+  assert.equal(app.evaluate('session'), null);
+  assert.match(app.elements.get('#content').innerHTML, /All words learned/);
+});
+
+test('saved learned words are excluded after account reload and short rounds keep their selection', async () => {
+  const progress = { ...empty(), wordCorrectCounts: { '0': 8, '1': 7 } };
+  const app = boot(async path => response(path === '/api/auth/me' ? { user } : { userId: user.id, progress, revision: 4 }));
+  await settle();
+  app.evaluate('startWords([WORDS[0],WORDS[1]])');
+  assert.equal(app.evaluate('session.items.length'), 1);
+  assert.equal(app.evaluate('session.items[0].id'), 1);
+  assert.equal(app.evaluate('session.current.kind'), 'type');
+  app.evaluate('finishSession()');
+  app.elements.get('#again').onclick();
+  assert.equal(app.evaluate('session.items.length'), 1);
+  assert.equal(app.evaluate('session.items[0].id'), 1);
+});
+
 test('vocabulary accepts optional articles, case and alternative umlaut spellings; grammar still checks articles', async () => {
   const app = boot(async () => response({ user: null }));
   await settle();

@@ -7,6 +7,7 @@ const rules = ['sein', 'present', 'articles', 'accusative', 'modal', 'wordorder'
 export const progressSchema = z.object({
   xp: counter, answered: counter, correct: counter,
   wordMastery: z.record(z.string().regex(/^(?:[0-9]|[1-3][0-9]|4[0-3])$/), score),
+  wordCorrectCounts: z.record(z.string().regex(/^(?:[0-9]|[1-3][0-9]|4[0-3])$/), z.number().int().min(0).max(8)).default({}),
   ruleMastery: z.record(z.string().refine(key => rules.includes(key)), score),
   streak: counter, sound: z.boolean(), activity: z.array(counter).length(7),
 }).strict().refine(data => data.correct <= data.answered);

@@ -58,7 +58,10 @@ test('accounts, password policy, protected progress, rate limits and revocable s
     assert.equal((await call('/api/auth/me', undefined, a.cookie)).result.user.id, a.result.user.id);
     const save = { userId: a.result.user.id, revision: 0, progress };
     assert.equal((await call('/api/progress', save, a.cookie)).response.status, 200);
-    assert.deepEqual((await call('/api/progress', undefined, a.cookie)).result.progress, progress);
+    assert.deepEqual((await call('/api/progress', undefined, a.cookie)).result.progress, { ...progress, wordCorrectCounts: {} }, 'older progress loads without losing existing scores');
+    const countedProgress = { ...progress, wordCorrectCounts: { '0': 8, '1': 3 } };
+    assert.equal((await call('/api/progress', { ...save, revision: 1, progress: countedProgress }, a.cookie)).response.status, 200);
+    assert.equal((await call('/api/progress', { ...save, revision: 2, progress: { ...countedProgress, wordCorrectCounts: { '0': 9 } } }, a.cookie)).response.status, 400);
     assert.equal((await call('/api/progress', save, a.cookie)).response.status, 409, 'stale device must not overwrite');
     assert.equal((await call('/api/progress', { ...save, revision: 1, progress: { ...progress, xp: '<script>' } }, a.cookie)).response.status, 400);
     const b = await register('bob@example.test');
@@ -67,7 +70,7 @@ test('accounts, password policy, protected progress, rate limits and revocable s
     const login = await call('/api/auth/login', { email: 'ALICE@example.test', password });
     assert.equal(login.response.status, 200);
     assert.notEqual(login.cookie, a.cookie);
-    assert.deepEqual((await call('/api/progress', undefined, login.cookie)).result.progress, progress);
+    assert.deepEqual((await call('/api/progress', undefined, login.cookie)).result.progress, countedProgress, 'per-word counts survive signing out and back in');
     const token = login.cookie.split('=')[1];
     assert.ok(await db.prepare('SELECT token_hash FROM auth_sessions WHERE token_hash = ?').bind(createHash('sha256').update(token).digest('hex')).first());
     assert.equal((await call('/api/auth/logout', {}, login.cookie, { origin: 'https://evil.test' })).response.status, 403);
