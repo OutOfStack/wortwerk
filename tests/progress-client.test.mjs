@@ -8,6 +8,39 @@ const empty = () => ({ xp: 0, answered: 0, correct: 0, wordMastery: {}, ruleMast
 const user = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', email: 'alice@example.test' };
 const response = (body, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
 const settle = () => new Promise(resolve => setImmediate(resolve));
+
+test('vocabulary accepts optional articles, case and alternative umlaut spellings; grammar still checks articles', async () => {
+  const app = boot(async () => response({ user: null }));
+  await settle();
+  app.evaluate("session={type:'words',current:{kind:'type',answer:'der Käse',word:{de:'der Käse',en:'cheese'}}}");
+  for (const value of ['käse', 'KASE', 'kaese', 'DER KÄSE', '  der   kase  ', 'Ka\u0308se']) {
+    assert.equal(app.evaluate(`matchesAnswer(${JSON.stringify(value)})`), true, value);
+  }
+  for (const value of ['', 'der', 'kaffee', 'kas']) assert.equal(app.evaluate(`matchesAnswer(${JSON.stringify(value)})`), false, value);
+  app.evaluate("session.current.answer='die Straße'");
+  assert.equal(app.evaluate("matchesAnswer('STRASSE')"), true);
+  app.evaluate("session.current.answer='gemütlich'");
+  assert.equal(app.evaluate("matchesAnswer('gemutlich')"), true);
+  assert.equal(app.evaluate("matchesAnswer('gemuetlich')"), true);
+  app.evaluate("session={type:'grammar',current:{answer:'der'}}");
+  assert.equal(app.evaluate("matchesAnswer('der')"), true);
+  assert.equal(app.evaluate("matchesAnswer('die')"), false);
+  assert.equal(app.evaluate("matchesAnswer('das')"), false);
+  assert.equal(app.evaluate("matchesAnswer('')"), false);
+});
+
+test('vocabulary feedback always shows the full German word and translation', async () => {
+  const app = boot(async () => response({ user: null }));
+  await settle();
+  for (const kind of ['type', 'letters', 'choice']) {
+    app.evaluate(`session={type:'words',current:{kind:${JSON.stringify(kind)},answer:'Käse',word:{de:'der Käse',en:'cheese'}}}`);
+    for (const correct of [true, false]) {
+      const feedback = app.evaluate(`answerFeedback(${correct})`);
+      assert.match(feedback, /der Käse/);
+      assert.match(feedback, /cheese/);
+    }
+  }
+});
 function boot(fetch) {
   const elements = new Map();
   const element = () => ({ textContent: '', innerHTML: '', classList: { add() {}, remove() {}, toggle() {} }, replaceChildren() {}, append() {} });
