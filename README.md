@@ -34,9 +34,10 @@ Email currently serves as the login identifier; mailbox verification and
 self-service password-reset emails are not implemented. Existing ChatGPT Site
 progress is not automatically linked to new accounts.
 
-This source is prepared for standalone Cloudflare Workers + D1. It has not yet
-been deployed into the owner's Cloudflare account. The earlier ChatGPT-hosted
-version remains separate and unchanged.
+Cloudflare Workers Builds is connected to this GitHub repository. Production
+signup is currently under investigation; successful account creation and saved
+progress still need verification. The ChatGPT-hosted version is a separate
+deployment and is not updated by GitHub pushes.
 
 ## Local development
 
@@ -120,6 +121,31 @@ Do not reduce the hashing cost to fit the free plan. If it exceeds the allowance
 use an appropriate Workers plan or move authentication to another runtime.
 See [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/)
 and [OWASP password storage guidance](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html).
+
+### Diagnose signup failures
+
+Workers Logs are enabled in the root `wrangler.jsonc`, including invocation logs
+at 100% sampling. Commit and push this configuration to `main` and wait for a
+successful Workers Builds deployment before retrying signup. Edit the root
+configuration, not `dist/server/wrangler.json`, which the build regenerates.
+Logging records new requests after deployment; it cannot recover earlier logs.
+
+In Cloudflare, open **Workers & Pages → wortwerk → Observability → Logs**, retry
+signup once, and inspect the `/api/auth/register` invocation:
+
+- `exceededCpu` / “Worker exceeded CPU time limit”: password hashing may exceed
+  the plan's CPU allowance. Check the invocation CPU time. A `limits.cpu_ms`
+  setting cannot raise the free plan's allowance; keep the password hash cost
+  intact and decide on a suitable Workers plan or another authentication runtime.
+- `D1_ERROR` / `no such table`: check the deployment's migration step and ensure
+  the `DB` binding points to the intended database. Use the migration command
+  above to apply pending migrations; do not delete or recreate the database.
+- `Wortwerk request failed`: inspect the accompanying server error message.
+- HTTP 429: the signup/login rate limit was reached; wait 15 minutes.
+
+Existing server error logs omit request bodies. Do not add passwords, session
+cookies, or tokens to logs. See [Workers Logs](https://developers.cloudflare.com/workers/observability/logs/workers-logs/)
+and [CPU limits](https://developers.cloudflare.com/workers/platform/limits/#cpu-time).
 
 ## Source layout
 

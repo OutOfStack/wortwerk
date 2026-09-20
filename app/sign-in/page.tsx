@@ -27,8 +27,13 @@ export default function SignIn() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: form.get('email'), password, confirmPassword: form.get('confirmPassword') }),
       });
-      const result = await response.json() as { error?: string };
-      if (!response.ok) throw new Error(result.error || 'Unable to sign in. Try again.');
+      // Cloudflare can return HTML/plain text when the Worker hits a limit.
+      // Keep that failure readable instead of exposing a JSON parse exception.
+      const result = await response.json().catch(() => null) as { error?: string } | null;
+      if (!response.ok || !result) {
+        throw new Error(typeof result?.error === 'string' ? result.error
+          : `Account service temporarily unavailable (HTTP ${response.status}). Please try again later.`);
+      }
       // Full navigation reinitializes account-specific learning state.
       window.location.assign('/');
     } catch (e) { setError(e instanceof Error ? e.message : 'Connection failed. Please try again.'); setBusy(false); }
