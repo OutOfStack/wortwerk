@@ -8,26 +8,35 @@ An early German A1–A2 practice app with English instructions.
 - English → German typed recall and letter-building exercises.
 - 44 vocabulary entries and 10 grammar modules (five questions per module).
 - Repeated grammar rounds with an 85% rolling mastery target.
-- Progress views and a Cloudflare D1 persistence endpoint.
+- Email/password registration, sign-in, sign-out and account-specific progress in Cloudflare D1.
 - A responsive interface for phones and desktops.
 
 This is a prototype, not a complete A1/A2 curriculum. The streak and activity
-tracking, answer validation and progress synchronization need further work.
+tracking and exercise answer validation need further work.
 
 ## Authentication and deployment status
 
-The current source was built for ChatGPT Sites. Its sign-in flow and trusted
-identity headers are supplied by that hosting platform. **It does not yet offer
-independent Google or email/password authentication.**
+Accounts now use email/password; no ChatGPT account or identity headers are used.
+Passwords require 8–128 characters, an uppercase letter, a lowercase letter,
+a number and a non-whitespace symbol. Password managers and paste are supported.
+Passwords are salted and hashed with scrypt (N=16384, r=8, p=5).
+Sessions use random opaque tokens stored as hashes, with seven-day expiry,
+HttpOnly/Secure/SameSite cookies and server-side revocation on sign-out.
+Mutating endpoints reject cross-origin requests. Login and registration have
+database-backed limits by normalized email and Cloudflare-provided client IP.
 
-Do not expose the current progress API on standalone hosting while trusting
-client-supplied `oai-authenticated-user-*` headers: these headers must come
-from a trusted authentication gateway. Independent authentication is required
-before deploying outside ChatGPT Sites.
+Progress is isolated by the authenticated user's ID. Guest progress stays
+device-local and is not automatically imported into an account. Saves reject
+stale revisions and account changes; errors remain visible rather than silently
+overwriting another device. Sessions are not stored in browser local storage.
 
-The planned destination is the owner's Cloudflare account using Workers and D1.
-That migration has not been completed. The hosting manifest retains only
-logical database settings; it does not include the original Site identity.
+Email currently serves as the login identifier; mailbox verification and
+self-service password-reset emails are not implemented. Existing ChatGPT Site
+progress is not automatically linked to new accounts.
+
+This source is prepared for standalone Cloudflare Workers + D1. It has not yet
+been deployed into the owner's Cloudflare account. The earlier ChatGPT-hosted
+version remains separate and unchanged.
 
 ## Local development
 
@@ -38,8 +47,9 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-A clean checkout uses the portable development profile. Local development
-includes a mock ChatGPT sign-in; this is not production authentication.
+A clean checkout uses the portable development profile. Mock ChatGPT sign-in is
+disabled. Accounts use the local D1 database while developing. HTTP session
+cookies are permitted only on localhost/loopback; deployment requires HTTPS.
 
 ```sh
 pnpm build
@@ -48,25 +58,60 @@ pnpm build
 To initialize the local D1 database after the first build:
 
 ```sh
-pnpm exec wrangler d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_amazing_maelstrom.sql
+pnpm exec wrangler d1 migrations apply DB --local --config wrangler.jsonc --persist-to .wrangler/state
 ```
 
-See [the starter development notes](docs/STARTER.md) for runtime details.
+The first migration creates progress storage; the next adds accounts, sessions,
+rate limits and progress revisions. Apply both in order. Do not re-run applied
+migrations manually. The historical [starter notes](docs/STARTER.md) describe the
+original platform; their ChatGPT-auth instructions no longer apply to this app.
+
+## Tests
+
+```sh
+pnpm test
+pnpm exec tsc --noEmit
+```
+
+The authentication suite runs in Cloudflare's local Workers runtime with D1.
+It exercises password policy, normalized emails, failed login, session cookies,
+expiry/revocation, CSRF rejection, forged identity headers, account isolation,
+stale progress revisions and persistent rate limits.
+
+## Deploy to your own Cloudflare account
+
+1. Authenticate from your own terminal: `pnpm exec wrangler login`.
+2. Create a D1 database: `pnpm exec wrangler d1 create wortwerk`.
+3. Put the returned database ID in `wrangler.jsonc`, replacing the placeholder.
+   Database IDs are configuration, not passwords. Never commit API tokens.
+4. Run `pnpm deploy`. This builds, applies migrations, then deploys the Worker.
+5. Open the HTTPS URL printed by Wrangler and create your account.
+
+Deployment deliberately stops until a real database ID is configured. No
+Cloudflare billing plan is enabled or upgraded by these scripts.
+
+Cloudflare's free CPU allowance is small (10 ms per request). Secure password
+hashing is CPU-intensive, so free-tier login feasibility must be measured on
+deployment; the local emulator does not enforce production CPU billing limits.
+Do not reduce the hashing cost to fit the free plan. If it exceeds the allowance,
+use an appropriate Workers plan or move authentication to another runtime.
+See [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/)
+and [OWASP password storage guidance](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html).
 
 ## Source layout
 
 - `public/app.js`: curriculum, exercises and client progress handling.
 - `public/styles.css`: interface styles.
-- `app/page.tsx`: app shell and current account controls.
+- `app/page.tsx` and `app/sign-in/page.tsx`: app shell and account form.
 - `app/api/progress/route.ts`: authenticated progress endpoint.
-- `app/chatgpt-auth.ts`: current platform-specific authentication.
+- `lib/auth.ts`, `lib/auth-handlers.ts`, `lib/password.ts`: independent authentication.
+- `lib/progress.ts`: validated, account-owned progress with revision checks.
 - `db/` and `drizzle/`: database schema and migrations.
 
 ## Next work
 
-- Replace platform-specific sign-in with independent authentication.
-- Harden progress validation, isolation and synchronization.
-- Configure deployment into the owner's Cloudflare account.
+- Deploy into the owner's Cloudflare account and verify production CPU limits.
+- Add email verification and password-reset delivery if required.
 - Expand and review the A1/A2 curriculum.
 
 No credentials, user progress data, installed dependencies or build output

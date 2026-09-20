@@ -1,11 +1,11 @@
 import vinext from "vinext";
+import { readFileSync } from 'node:fs';
 import { defineConfig } from "vite";
 import hostingConfig from "./.openai/hosting.json";
 import { readExecutionProfile } from "./scripts/execution-profile.mjs";
 import { sites } from "./build/sites-vite-plugin";
 
-const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
-  "00000000-0000-4000-8000-000000000000";
+const deployment = JSON.parse(readFileSync(new URL('./wrangler.jsonc', import.meta.url), 'utf8'));
 
 const { d1, r2 } = hostingConfig;
 
@@ -17,13 +17,7 @@ const localBindingConfig = {
   main: "vinext/server/fetch-handler",
   compatibility_flags: ["nodejs_compat"],
   d1_databases: d1
-    ? [
-        {
-          binding: d1,
-          database_name: "site-creator-d1",
-          database_id: SITE_CREATOR_PLACEHOLDER_DATABASE_ID,
-        },
-      ]
+    ? deployment.d1_databases
     : [],
   r2_buckets: r2
     ? [
@@ -57,7 +51,7 @@ export default defineConfig(async () => {
     },
     plugins: [
       vinext(),
-      sites({ mockAuth: !managedLinux }),
+      sites({ mockAuth: false }),
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         inspectorPort: false,
