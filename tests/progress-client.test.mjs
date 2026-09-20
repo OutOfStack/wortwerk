@@ -2,12 +2,70 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFile } from 'node:fs/promises';
+import { WORDS } from '../public/vocabulary.js';
 
-const source = await readFile('public/app.js', 'utf8');
+const source = (await readFile('public/app.js', 'utf8')).replace(/^import \{ WORDS \} from '\.\/vocabulary\.js';\n/, '');
 const empty = () => ({ xp: 0, answered: 0, correct: 0, wordMastery: {}, ruleMastery: {}, streak: 1, sound: true, activity: [0,0,0,0,0,0,0] });
 const user = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', email: 'alice@example.test' };
 const response = (body, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
 const settle = () => new Promise(resolve => setImmediate(resolve));
+
+test('expanded vocabulary retains legacy progress identities and has valid unique entries', async () => {
+  const legacy = JSON.parse(await readFile('tests/legacy-word-ids.json', 'utf8'));
+  for (const { id, de } of legacy) assert.equal(WORDS.find(word => word.id === id)?.de, de);
+  assert.equal(new Set(WORDS.map(word => word.id)).size, WORDS.length);
+  assert.equal(new Set(WORDS.map(word => word.de)).size, WORDS.length);
+  assert.ok(WORDS.length > legacy.length);
+  for (const word of WORDS) {
+    assert.ok(Number.isInteger(word.id) && word.id >= 0);
+    assert.ok(['A1', 'A2'].includes(word.level));
+    assert.ok(['noun', 'verb', 'adjective', 'adverb', 'conjunction'].includes(word.pos));
+    assert.ok(word.de && word.en && word.topic);
+    if (word.pos === 'noun') assert.match(word.de, /^(der|die|das) /);
+  }
+});
+
+test('every word has four distinct choices of the same part of speech and one correct meaning', async () => {
+  const app = boot(async () => response({ user: null }));
+  await settle();
+  for (const word of WORDS) {
+    const question = app.evaluate(`wordForm(WORDS.find(word=>word.id===${word.id}),0)`);
+    assert.equal(question.kind, 'choice', word.de);
+    assert.equal(question.opts.length, 4, word.de);
+    assert.equal(question.opts.filter(option => option === word.en).length, 1, word.de);
+    const meanings = question.opts.flatMap(option => option.split(' / ').map(value => value.toLowerCase()));
+    assert.equal(new Set(meanings).size, meanings.length, word.de);
+    for (const option of question.opts) {
+      assert.ok(WORDS.some(other => other.en === option && other.pos === word.pos), `${word.de}: ${option}`);
+    }
+  }
+});
+
+test('distractors prefer the topic and level, including verbs inside themed topics', async () => {
+  const app = boot(async () => response({ user: null }));
+  await settle();
+  for (const de of ['der Apfel', 'umsteigen', 'schwimmen', 'krank']) {
+    const word = WORDS.find(word => word.de === de);
+    const opts = app.evaluate(`wordChoices(WORDS.find(word=>word.id===${word.id}))`);
+    for (const option of opts) {
+      assert.ok(WORDS.some(other => other.en === option && other.pos === word.pos && other.topic === word.topic && other.level === word.level));
+    }
+  }
+  const sparse = app.evaluate("wordForm({id:9999,de:'ich',en:'I',pos:'pronoun',topic:'Pronouns',level:'A1'},0)");
+  assert.equal(sparse.kind, 'type', 'never pad a small category with unrelated word types');
+});
+
+test('shuffling preserves entries and choices vary without changing the source pool', async () => {
+  const app = boot(async () => response({ user: null }));
+  await settle();
+  app.evaluate('const pool=[1,2,3,4]; const originalRandom=Math.random; Math.random=()=>0;');
+  assert.equal(JSON.stringify(app.evaluate('shuffle(pool)')), '[2,3,4,1]');
+  assert.equal(JSON.stringify(app.evaluate('pool')), '[1,2,3,4]');
+  const first = JSON.stringify(app.evaluate('wordChoices(WORDS[0])'));
+  app.evaluate('Math.random=()=>0.99');
+  assert.notEqual(JSON.stringify(app.evaluate('wordChoices(WORDS[0])')), first);
+  app.evaluate('Math.random=originalRandom');
+});
 
 test('eight correct recalls retire a word, incorrect and duplicate answers do not advance it', async () => {
   const app = boot(async () => response({ user: null }));
@@ -87,7 +145,7 @@ function boot(fetch) {
     localStorage: { getItem: k => storage.get(k), setItem: (k, v) => storage.set(k, v) },
     window: { addEventListener() {} }, location: { assign() {} },
   });
-  vm.runInContext(source, context);
+  vm.runInContext(`const WORDS=${JSON.stringify(WORDS)};\n${source}`, context);
   return { evaluate: code => vm.runInContext(code, context), elements, storage };
 }
 

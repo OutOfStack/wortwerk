@@ -6,17 +6,21 @@ An early German A1–A2 practice app with English instructions.
 
 - German → English multiple-choice vocabulary exercises.
 - English → German typed recall and letter-building exercises.
-- 44 vocabulary entries and 10 grammar modules (five questions per module).
+- 295 vocabulary entries across 17 topics and 10 grammar modules (five questions per module).
+- Randomized multiple-choice answers use the same part of speech, preferring the same topic and level.
+- Per-word progress: eight correct answers retire a word from normal practice.
+- Vocabulary accepts optional articles, capitalization and alternative umlaut spellings.
 - Repeated grammar rounds with an 85% rolling mastery target.
+- Grammar theory, translated examples, tables and common mistakes.
 - Email/password registration, sign-in, sign-out and account-specific progress in Cloudflare D1.
 - A responsive interface for phones and desktops.
 
-This is a prototype, not a complete A1/A2 curriculum. The streak and activity
-tracking and exercise answer validation need further work.
+This is a prototype, not a complete A1/A2 curriculum. Streak and activity
+tracking need further work.
 
 ## Authentication and deployment status
 
-Accounts now use email/password; no ChatGPT account or identity headers are used.
+Accounts use email/password and server-validated session cookies.
 Passwords require 8–128 characters, an uppercase letter, a lowercase letter,
 a number and a non-whitespace symbol. Password managers and paste are supported.
 Passwords are salted and hashed with scrypt (N=16384, r=8, p=5).
@@ -31,13 +35,14 @@ stale revisions and account changes; errors remain visible rather than silently
 overwriting another device. Sessions are not stored in browser local storage.
 
 Email currently serves as the login identifier; mailbox verification and
-self-service password-reset emails are not implemented. Existing ChatGPT Site
-progress is not automatically linked to new accounts.
+self-service password-reset emails are not implemented. Historical progress
+from the former ChatGPT-hosted app is not automatically linked to new accounts.
 
-Cloudflare Workers Builds is connected to this GitHub repository. Production
-signup is currently under investigation; successful account creation and saved
-progress still need verification. The ChatGPT-hosted version is a separate
-deployment and is not updated by GitHub pushes.
+Production runs at https://wortwerk.ftavlad.workers.dev/ on Cloudflare Workers
+with D1. Workers Builds deploys GitHub's `main` branch after applying pending
+migrations. The earlier missing authentication tables were resolved by running
+the migrations; full account creation and saved progress still need production
+verification. This repository now targets standalone Cloudflare deployment.
 
 ## Local development
 
@@ -45,33 +50,28 @@ Requirements: Node.js 22.13 or newer and pnpm 11.25.0.
 
 ```sh
 pnpm install --frozen-lockfile
+pnpm exec wrangler d1 migrations apply DB --local --config wrangler.jsonc --persist-to .wrangler/state
 pnpm dev
 ```
 
-A clean checkout uses the portable development profile. Mock ChatGPT sign-in is
-disabled. Accounts use the local D1 database while developing. HTTP session
+Development uses the same email/password flow with a local D1 database. HTTP session
 cookies are permitted only on localhost/loopback; deployment requires HTTPS.
 
 ```sh
 pnpm build
-```
-
-To initialize the local D1 database after the first build:
-
-```sh
-pnpm exec wrangler d1 migrations apply DB --local --config wrangler.jsonc --persist-to .wrangler/state
+pnpm start
 ```
 
 The first migration creates progress storage; the next adds accounts, sessions,
 rate limits and progress revisions. Apply both in order. Do not re-run applied
-migrations manually. The historical [starter notes](docs/STARTER.md) describe the
-original platform; their ChatGPT-auth instructions no longer apply to this app.
+migrations manually. Tooling state stays in ignored `.wrangler/` files.
 
 ## Tests
 
 ```sh
 pnpm test
-pnpm exec tsc --noEmit
+pnpm typecheck
+pnpm lint
 ```
 
 The authentication suite runs in Cloudflare's local Workers runtime with D1.
@@ -82,8 +82,9 @@ stale progress revisions and persistent rate limits.
 ## Deploy to your own Cloudflare account
 
 1. Authenticate from your own terminal: `pnpm exec wrangler login`.
-2. Create a D1 database: `pnpm exec wrangler d1 create wortwerk`.
-3. Put the returned database ID in `wrangler.jsonc`, replacing the placeholder.
+2. The owner's D1 database is already configured. For a separate installation,
+   create one with `pnpm exec wrangler d1 create wortwerk`.
+3. For a separate installation, put its database ID in `wrangler.jsonc`.
    Database IDs are configuration, not passwords. Never commit API tokens.
 4. Run `pnpm deploy`. This builds, applies migrations, then deploys the Worker.
 5. Open the HTTPS URL printed by Wrangler and create your account.
@@ -96,9 +97,8 @@ Cloudflare billing plan is enabled or upgraded by these scripts.
 When Cloudflare is connected directly to this repository, its build service
 handles deployment authentication. No GitHub Actions secrets are required.
 
-Create a D1 database named `wortwerk` in your Cloudflare account and replace the
-placeholder `database_id` in `wrangler.jsonc` with its ID. Keep the binding name
-`DB`. Database bindings are declared only in `wrangler.jsonc`: the Vite plugin
+Keep the existing database ID for this deployment and the binding name `DB`.
+Database bindings are declared only in `wrangler.jsonc`: the Vite plugin
 merges arrays, so repeating the binding in `vite.config.ts` creates duplicates.
 
 Use these build settings:
@@ -150,16 +150,26 @@ and [CPU limits](https://developers.cloudflare.com/workers/platform/limits/#cpu-
 ## Source layout
 
 - `public/app.js`: curriculum, exercises and client progress handling.
+- `public/vocabulary.js`: shared vocabulary catalog with permanent word IDs and parts of speech.
 - `public/styles.css`: interface styles.
 - `app/page.tsx` and `app/sign-in/page.tsx`: app shell and account form.
 - `app/api/progress/route.ts`: authenticated progress endpoint.
 - `lib/auth.ts`, `lib/auth-handlers.ts`, `lib/password.ts`: independent authentication.
 - `lib/progress.ts`: validated, account-owned progress with revision checks.
 - `db/` and `drizzle/`: database schema and migrations.
+- `scripts/worker-env.mjs`: local Wrangler/Miniflare tooling paths.
+- `scripts/deploy-cloudflare.mjs`: build, migration and deployment sequence.
+
+Vocabulary IDs are permanent saved-progress keys. Add new entries with new IDs;
+do not renumber or reuse existing IDs. The server validates progress against
+this same catalog. Parts of speech describe the practised meaning, independently
+of the topic (for example, `umsteigen` is a verb in Travel). Duplicate English
+meanings are excluded from answer options; categories with fewer than four
+distinct meanings fall back to typed recall.
 
 ## Next work
 
-- Deploy into the owner's Cloudflare account and verify production CPU limits.
+- Verify the complete production account/progress flow and monitor CPU usage.
 - Add email verification and password-reset delivery if required.
 - Expand and review the A1/A2 curriculum.
 

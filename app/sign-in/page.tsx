@@ -38,7 +38,7 @@ export default function SignIn() {
       window.location.assign('/');
     } catch (e) { setError(e instanceof Error ? e.message : 'Connection failed. Please try again.'); setBusy(false); }
   }
-  return <><link rel="stylesheet" href="/styles.css" /><main className="auth-page">
+  return <main className="auth-page">
     <a className="brand auth-brand" href="/"><span>W</span>Wortwerk</a>
     <section className="auth-card"><span className="eyebrow">Your German workshop</span>
       <h1>{register ? 'Make it yours.' : 'Welcome back.'}</h1>
@@ -54,5 +54,5 @@ export default function SignIn() {
       <button className="auth-switch" disabled={busy} onClick={() => { setRegister(!register); setError(''); setPassword(''); }}>{register ? 'Already have an account? Sign in' : 'New here? Create an account'}</button>
       <a className="guest-link" href="/">Continue as a guest</a>
     </section>
-  </main></>;
+  </main>;
 }

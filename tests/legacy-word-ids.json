@@ -1,0 +1,178 @@
+[
+  {
+    "id": 0,
+    "de": "der Apfel"
+  },
+  {
+    "id": 1,
+    "de": "das Brot"
+  },
+  {
+    "id": 2,
+    "de": "der Käse"
+  },
+  {
+    "id": 3,
+    "de": "das Wasser"
+  },
+  {
+    "id": 4,
+    "de": "der Kaffee"
+  },
+  {
+    "id": 5,
+    "de": "die Kartoffel"
+  },
+  {
+    "id": 6,
+    "de": "der Fisch"
+  },
+  {
+    "id": 7,
+    "de": "das Gemüse"
+  },
+  {
+    "id": 8,
+    "de": "das Haus"
+  },
+  {
+    "id": 9,
+    "de": "das Zimmer"
+  },
+  {
+    "id": 10,
+    "de": "der Tisch"
+  },
+  {
+    "id": 11,
+    "de": "der Stuhl"
+  },
+  {
+    "id": 12,
+    "de": "das Fenster"
+  },
+  {
+    "id": 13,
+    "de": "die Küche"
+  },
+  {
+    "id": 14,
+    "de": "das Bett"
+  },
+  {
+    "id": 15,
+    "de": "die Tür"
+  },
+  {
+    "id": 16,
+    "de": "gehen"
+  },
+  {
+    "id": 17,
+    "de": "kommen"
+  },
+  {
+    "id": 18,
+    "de": "machen"
+  },
+  {
+    "id": 19,
+    "de": "lernen"
+  },
+  {
+    "id": 20,
+    "de": "sprechen"
+  },
+  {
+    "id": 21,
+    "de": "wohnen"
+  },
+  {
+    "id": 22,
+    "de": "kaufen"
+  },
+  {
+    "id": 23,
+    "de": "brauchen"
+  },
+  {
+    "id": 24,
+    "de": "der Bahnhof"
+  },
+  {
+    "id": 25,
+    "de": "die Straße"
+  },
+  {
+    "id": 26,
+    "de": "der Supermarkt"
+  },
+  {
+    "id": 27,
+    "de": "die Apotheke"
+  },
+  {
+    "id": 28,
+    "de": "der Park"
+  },
+  {
+    "id": 29,
+    "de": "die Schule"
+  },
+  {
+    "id": 30,
+    "de": "die Erfahrung"
+  },
+  {
+    "id": 31,
+    "de": "die Einladung"
+  },
+  {
+    "id": 32,
+    "de": "die Reise"
+  },
+  {
+    "id": 33,
+    "de": "die Unterkunft"
+  },
+  {
+    "id": 34,
+    "de": "der Fahrplan"
+  },
+  {
+    "id": 35,
+    "de": "umsteigen"
+  },
+  {
+    "id": 36,
+    "de": "vereinbaren"
+  },
+  {
+    "id": 37,
+    "de": "erklären"
+  },
+  {
+    "id": 38,
+    "de": "vergessen"
+  },
+  {
+    "id": 39,
+    "de": "passieren"
+  },
+  {
+    "id": 40,
+    "de": "pünktlich"
+  },
+  {
+    "id": 41,
+    "de": "gemütlich"
+  },
+  {
+    "id": 42,
+    "de": "wahrscheinlich"
+  },
+  {
+    "id": 43,
+    "de": "deshalb"
+  }
+]

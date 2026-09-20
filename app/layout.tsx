@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "../public/styles.css";
 
 export const metadata: Metadata = {
   title: "Wortwerk — German practice",

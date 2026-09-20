@@ -1,13 +1,16 @@
 import { z } from 'zod';
 import { failure, getUser, guardMutation, HttpError, json, readJson } from './auth';
+import { WORDS } from '../public/vocabulary';
 
 const score = z.number().int().min(0).max(100);
 const counter = z.number().int().min(0).max(1_000_000_000);
+const wordIds = new Set(WORDS.map(word => String(word.id)));
+const wordId = z.string().refine(id => wordIds.has(id));
 const rules = ['sein', 'present', 'articles', 'accusative', 'modal', 'wordorder', 'perfect', 'dative', 'because', 'comparative'];
 export const progressSchema = z.object({
   xp: counter, answered: counter, correct: counter,
-  wordMastery: z.record(z.string().regex(/^(?:[0-9]|[1-3][0-9]|4[0-3])$/), score),
-  wordCorrectCounts: z.record(z.string().regex(/^(?:[0-9]|[1-3][0-9]|4[0-3])$/), z.number().int().min(0).max(8)).default({}),
+  wordMastery: z.record(wordId, score),
+  wordCorrectCounts: z.record(wordId, z.number().int().min(0).max(8)).default({}),
   ruleMastery: z.record(z.string().refine(key => rules.includes(key)), score),
   streak: counter, sound: z.boolean(), activity: z.array(counter).length(7),
 }).strict().refine(data => data.correct <= data.answered);

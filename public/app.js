@@ -1,10 +1,5 @@
-const WORDS=[
-['der Apfel','apple','A1','Food'],['das Brot','bread','A1','Food'],['der Käse','cheese','A1','Food'],['das Wasser','water','A1','Food'],['der Kaffee','coffee','A1','Food'],['die Kartoffel','potato','A1','Food'],['der Fisch','fish','A1','Food'],['das Gemüse','vegetables','A1','Food'],
-['das Haus','house','A1','Home'],['das Zimmer','room','A1','Home'],['der Tisch','table','A1','Home'],['der Stuhl','chair','A1','Home'],['das Fenster','window','A1','Home'],['die Küche','kitchen','A1','Home'],['das Bett','bed','A1','Home'],['die Tür','door','A1','Home'],
-['gehen','to go','A1','Verbs'],['kommen','to come','A1','Verbs'],['machen','to do / make','A1','Verbs'],['lernen','to learn','A1','Verbs'],['sprechen','to speak','A1','Verbs'],['wohnen','to live','A1','Verbs'],['kaufen','to buy','A1','Verbs'],['brauchen','to need','A1','Verbs'],
-['der Bahnhof','train station','A1','City'],['die Straße','street','A1','City'],['der Supermarkt','supermarket','A1','City'],['die Apotheke','pharmacy','A1','City'],['der Park','park','A1','City'],['die Schule','school','A1','City'],
-['die Erfahrung','experience','A2','Life'],['die Einladung','invitation','A2','Life'],['die Reise','trip','A2','Travel'],['die Unterkunft','accommodation','A2','Travel'],['der Fahrplan','timetable','A2','Travel'],['umsteigen','to change trains','A2','Travel'],['vereinbaren','to arrange','A2','Verbs'],['erklären','to explain','A2','Verbs'],['vergessen','to forget','A2','Verbs'],['passieren','to happen','A2','Verbs'],['pünktlich','punctual','A2','Adjectives'],['gemütlich','cosy','A2','Adjectives'],['wahrscheinlich','probably','A2','Adverbs'],['deshalb','therefore','A2','Connectors']
-].map((w,i)=>({id:i,de:w[0],en:w[1],level:w[2],topic:w[3]}));
+import { WORDS } from './vocabulary.js';
+
 
 const RULES=[
  {id:'sein',level:'A1',title:'sein — to be',desc:'ich bin, du bist, er/sie ist…',tip:'Choose the form of sein that matches the subject.',qs:[['Ich ___ müde.','bin',['bist','ist','sind']],['Du ___ nett.','bist',['bin','seid','sind']],['Wir ___ hier.','sind',['seid','ist','bin']],['Ihr ___ spät.','seid',['sind','bist','ist']],['Anna ___ in Berlin.','ist',['bin','seid','sind']]]},
@@ -112,7 +107,11 @@ function flushProgress(){
   })().finally(()=>{saving=null});
   return saving;
 }
-const shuffle=a=>[...a].sort(()=>Math.random()-.5);
+function shuffle(values){
+ const result=[...values];
+ for(let i=result.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[result[i],result[j]]=[result[j],result[i]]}
+ return result;
+}
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function updateChrome(){const mastered=Object.values(state.ruleMastery).filter(x=>x>=85).length;$('#levelPct').textContent=Math.min(100,Math.round(state.xp/5))+'%';$('#totalMastery').textContent=mastered+' skills mastered';$('#streakCount').textContent=state.streak}
 function go(view){if(!ready)return;currentView=view;document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));$('.sidebar').classList.remove('open');({today:renderToday,words:renderWords,grammar:renderGrammar,progress:renderProgress}[view]||renderToday)()}
@@ -131,7 +130,33 @@ function startWords(pool=WORDS){
  if(!items.length){session=null;content.innerHTML=`<div class="practice-wrap"><section class="practice"><span class="eyebrow">Vocabulary complete</span><h1>All words learned.</h1><p class="intro">You have answered every word in this selection correctly ${WORD_TARGET} times. These words will no longer appear in practice.</p><button class="primary" id="backToWords">Back to vocabulary</button></section></div>`;$('#backToWords').onclick=()=>go('words');return}
  session={type:'words',pool,items,index:0,roundCorrect:0};renderWordQuestion();
 }
-function wordForm(w,i){let mode=i%3;if(mode===0){let opts=shuffle([w.en,...shuffle(WORDS.filter(x=>x.id!==w.id)).slice(0,3).map(x=>x.en)]);return {label:'Choose the English meaning',prompt:w.de,answer:w.en,kind:'choice',opts}}if(mode===1)return {label:'Type the German translation',prompt:w.en,answer:w.de,kind:'type'};let clean=w.de.replace(/^(der|die|das) /,'');return {label:'Build the German word',prompt:w.en,answer:clean,kind:'letters',opts:shuffle(clean.split(''))}}
+function wordChoices(word){
+ // Prefer related words, but never fill a gap with a different part of speech.
+ const priority=other=>(other.topic===word.topic?0:2)+(other.level===word.level?0:1);
+ const candidates=shuffle(WORDS.filter(other=>other.id!==word.id&&other.pos===word.pos))
+  .sort((a,b)=>priority(a)-priority(b));
+ const meanings=english=>english.split(' / ').map(normalise);
+ const used=new Set(meanings(word.en)), options=[word.en];
+ for(const other of candidates){
+  const alternatives=meanings(other.en);
+  if(alternatives.some(meaning=>used.has(meaning)))continue;
+  alternatives.forEach(meaning=>used.add(meaning));
+  options.push(other.en);
+  if(options.length===4)break;
+ }
+ return shuffle(options);
+}
+function wordForm(word,correctCount){
+ const mode=correctCount%3;
+ if(mode===0){
+  const opts=wordChoices(word);
+  if(opts.length===4)return {label:'Choose the English meaning',prompt:word.de,answer:word.en,kind:'choice',opts};
+ }
+ // Sparse future categories use recall instead of obvious or duplicate options.
+ if(mode!==2)return {label:'Type the German translation',prompt:word.en,answer:word.de,kind:'type'};
+ const clean=word.de.replace(/^(der|die|das) /,'');
+ return {label:'Build the German word',prompt:word.en,answer:clean,kind:'letters',opts:shuffle(clean.split(''))};
+}
 function practiceShell(inner){content.innerHTML=`<div class="practice-wrap"><section class="practice"><div class="practice-top"><button class="secondary" id="quit">Exit</button><div class="bar"><span style="width:${session.index/session.items.length*100}%"></span></div><strong>${session.index+1}/${session.items.length}</strong></div>${inner}<div id="feedback" class="feedback hidden"></div></section></div>`;$('#quit').onclick=()=>go(session.type==='words'?'words':'grammar')}
 function renderWordQuestion(){if(session.index>=session.items.length)return finishSession();let w=session.items[session.index],q=wordForm(w,wordCorrect(w));session.current={...q,word:w};let body=`<div class="prompt-label">${q.label} · ${wordCorrect(w)}/${WORD_TARGET} correct</div><div class="prompt">${esc(q.prompt)}</div>`;if(q.kind==='choice')body+=`<div class="choices">${q.opts.map(o=>`<button class="choice" data-answer="${esc(o)}">${esc(o)}</button>`).join('')}</div>`;if(q.kind==='type')body+=`<form class="type-row" id="answerForm"><input id="typed" autocomplete="off" placeholder="Type in German…" aria-label="Your answer" aria-describedby="answerHint"><button class="primary">Check</button></form><p class="answer-hint" id="answerHint">Articles are optional. Uppercase or lowercase is fine; ä/ö/ü can be a/o/u or ae/oe/ue, and ß can be ss.</p>`;if(q.kind==='letters')body+=`<div class="answer-slots" id="built"></div><div class="letters">${q.opts.map((o,i)=>`<button class="letter" data-letter="${esc(o)}" data-i="${i}">${esc(o)}</button>`).join('')}</div><button class="primary" id="checkBuilt">Check</button>`;practiceShell(body);if(q.kind==='choice')document.querySelectorAll('[data-answer]').forEach(b=>b.onclick=()=>answer(b.dataset.answer,b));if(q.kind==='type')$('#answerForm').onsubmit=e=>{e.preventDefault();answer($('#typed').value)};if(q.kind==='letters'){let built='';document.querySelectorAll('[data-letter]').forEach(b=>b.onclick=()=>{built+=b.dataset.letter;b.disabled=true;$('#built').textContent=built});$('#checkBuilt').onclick=()=>answer(built)}}
 function startRule(id){let rule=RULES.find(r=>r.id===id);session={type:'grammar',rule,items:shuffle(rule.qs),index:0,roundCorrect:0};renderRuleQuestion()}
@@ -147,9 +172,8 @@ function answerFeedback(ok){
  if(session.type==='words'){const word=session.current.word;return `${ok?'':'Correct answer: '}<span lang="de">${esc(word.de)}</span> — ${esc(word.en)}<br><span class="word-progress">${wordCorrect(word)}/${WORD_TARGET} correct${wordCorrect(word)>=WORD_TARGET?' · Learned! This word leaves your practice pool.':''}</span>`}
  return ok?'Well done.':'Correct answer: '+esc(session.current.answer);
 }
-function answer(value,button){if(session.locked)return;session.locked=true;let ok=matchesAnswer(value);state.answered++;if(ok){state.correct++;session.roundCorrect++;state.xp+=10}else state.xp+=2;state.activity[new Date().getDay()?new Date().getDay()-1:6]++;if(session.type==='words'){let id=session.current.word.id;state.wordCorrectCounts??={};if(ok)state.wordCorrectCounts[id]=Math.min(WORD_TARGET,wordCorrect(session.current.word)+1);state.wordMastery[id]=Math.round(wordCorrect(session.current.word)/WORD_TARGET*100)}if(button){button.classList.add(ok?'correct':'wrong');document.querySelectorAll('.choice').forEach(b=>{if(matchesAnswer(b.dataset.answer))b.classList.add('correct');b.disabled=true})}let f=$('#feedback');f.className='feedback '+(ok?'good':'bad');f.innerHTML=`<div><strong>${ok?'Richtig!':'Not quite'}</strong><br>${answerFeedback(ok)}</div><button class="primary" id="next">Continue</button>`;save();$('#next').onclick=()=>{session.index++;session.locked=false;session.type==='words'?renderWordQuestion():renderRuleQuestion()}}
+function answer(value,button){if(session.locked)return;session.locked=true;let ok=matchesAnswer(value);state.answered++;if(ok){state.correct++;session.roundCorrect++;state.xp+=10}else state.xp+=2;state.activity[new Date().getDay()?new Date().getDay()-1:6]++;if(session.type==='words'){let id=session.current.word.id;state.wordCorrectCounts??={};if(ok)state.wordCorrectCounts[id]=Math.min(WORD_TARGET,wordCorrect(session.current.word)+1);state.wordMastery[id]=Math.round(wordCorrect(session.current.word)/WORD_TARGET*100)}if(button){button.classList.add(ok?'correct':'wrong');document.querySelectorAll('.choice').forEach(b=>{if(matchesAnswer(b.dataset.answer))b.classList.add('correct');b.disabled=true})}let f=$('#feedback');f.className='feedback '+(ok?'good':'bad');f.innerHTML=`<div><strong>${ok?'Richtig!':'Not quite'}</strong><br>${answerFeedback(ok)}</div><button class="primary" id="next">Continue</button>`;save();$('#next').onclick=()=>{session.index++;session.locked=false;if(session.type==='words')renderWordQuestion();else renderRuleQuestion()}}
 function finishSession(){let pct=Math.round(session.roundCorrect/session.items.length*100);if(session.type==='grammar'){let old=state.ruleMastery[session.rule.id]||0;state.ruleMastery[session.rule.id]=Math.round(old*.55+pct*.45);save()}content.innerHTML=`<div class="practice-wrap"><section class="practice"><span class="eyebrow">Round complete</span><h1>${pct>=80?'Sehr gut!':'Keep building.'}</h1><p class="intro">You answered ${session.roundCorrect} of ${session.items.length} correctly.</p><div class="stats"><div class="stat"><strong>${pct}%</strong><small>this round</small></div><div class="stat"><strong>+${session.roundCorrect*10+(session.items.length-session.roundCorrect)*2}</strong><small>XP earned</small></div>${session.type==='grammar'?`<div class="stat"><strong>${state.ruleMastery[session.rule.id]}%</strong><small>rolling mastery</small></div>`:`<div class="stat"><strong>${session.items.length}</strong><small>words reviewed</small></div>`}</div><div class="type-row"><button class="primary" id="again">Practise again</button><button class="secondary" id="done">Done</button></div></section></div>`;$('#again').onclick=()=>session.type==='words'?startWords(session.pool):startRule(session.rule.id);$('#done').onclick=()=>go(session.type==='words'?'words':'grammar')}
-function toast(msg){let t=$('#toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800)}
 async function loadAccount(){
   try{
     const response=await fetch('/api/auth/me',{cache:'no-store'});

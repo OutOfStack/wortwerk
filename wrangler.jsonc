@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "wortwerk",
-  "main": "dist/server/index.js",
+  "main": "vinext/server/fetch-handler",
   "compatibility_date": "2026-05-15",
   "compatibility_flags": ["nodejs_compat"],
   "observability": {
@@ -13,9 +13,6 @@
     },
     "traces": { "enabled": false }
   },
-  "no_bundle": true,
-  "find_additional_modules": true,
-  "rules": [{ "type": "ESModule", "globs": ["**/*.js", "**/*.mjs"] }],
   "assets": { "directory": "dist/client" },
   "d1_databases": [{
     "binding": "DB",

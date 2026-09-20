@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import { readFile, readdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { test } from 'node:test';
+import { WORDS } from '../public/vocabulary.js';
 
 const require = createRequire(import.meta.url);
 // Wrangler already owns these exact runtime/testing dependencies.
@@ -83,5 +84,16 @@ test('accounts, password policy, protected progress, rate limits and revocable s
     assert.equal((await call('/api/auth/login', { email: 'limited@example.test', password })).response.status, 429);
     for (let i = 0; i < 5; i++) await register(`rate${i}@example.test`, 'weak', { 'cf-connecting-ip': '198.51.100.1' });
     assert.equal((await register('rate6@example.test', password, { 'cf-connecting-ip': '198.51.100.1' })).response.status, 429);
+
+    const expandedProgress = {
+      ...progress,
+      wordMastery: Object.fromEntries(WORDS.map(word => [word.id, 100])),
+      wordCorrectCounts: Object.fromEntries(WORDS.map(word => [word.id, 8])),
+    };
+    assert.equal((await call('/api/progress', { ...save, revision: 2, progress: expandedProgress }, a.cookie)).response.status, 200);
+    assert.deepEqual((await call('/api/progress', undefined, a.cookie)).result.progress, expandedProgress, 'every new word can be saved and reloaded');
+    for (const key of ['wordMastery', 'wordCorrectCounts']) {
+      assert.equal((await call('/api/progress', { ...save, revision: 3, progress: { ...expandedProgress, [key]: { '999999': 1 } } }, a.cookie)).response.status, 400, 'unknown word IDs remain invalid');
+    }
   } finally { await mf.dispose(); }
 });

@@ -9,7 +9,8 @@ const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
 for (const args of [
   ['build'],
   ['exec', 'wrangler', 'd1', 'migrations', 'apply', 'DB', '--remote', '--config', 'wrangler.jsonc'],
-  ['exec', 'wrangler', 'deploy', '--config', 'wrangler.jsonc'],
+  // Deploy the Vite-generated config via Wrangler's automatic redirect.
+  ['exec', 'wrangler', 'deploy'],
 ]) {
   const result = spawnSync(pnpm, args, { stdio: 'inherit', shell: process.platform === 'win32' });
   if (result.error) throw result.error;
