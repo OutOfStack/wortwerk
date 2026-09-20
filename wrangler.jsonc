@@ -11,7 +11,7 @@
   "d1_databases": [{
     "binding": "DB",
     "database_name": "wortwerk",
-    "database_id": "00000000-0000-4000-8000-000000000000",
+    "database_id": "83a1228f-82d6-49b2-9c8a-71d265bfb08d",
     "migrations_dir": "drizzle"
   }]
 }
