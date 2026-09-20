@@ -12,11 +12,33 @@ An early German A1–A2 practice app with English instructions.
 - Vocabulary accepts optional articles, capitalization and alternative umlaut spellings.
 - Repeated grammar rounds with an 85% rolling mastery target.
 - Grammar theory, translated examples, tables and common mistakes.
+- XP-based numbered levels with 30 military-inspired ranks and further Marshal ranks.
 - Email/password registration, sign-in, sign-out and account-specific progress in Cloudflare D1.
 - A responsive interface for phones and desktops.
 
 This is a prototype, not a complete A1/A2 curriculum. Streak and activity
 tracking need further work.
+
+## XP and practice ranks
+
+Each correct vocabulary answer earns **1 XP** and each correct grammar answer
+earns **2 XP**. Incorrect answers earn no XP. A word still retires after eight
+correct recalls, so completing a new word earns up to 8 XP.
+
+Level 1 starts at 0 XP. Reaching Level 2 takes 30 XP; each subsequent step costs
+50% more than the previous step, rounded to a whole XP: 30, 45, 68, 102, 153,
+230, and so on. Total thresholds begin at 0, 30, 75, 143, 245, and 398 XP.
+XP carries over on promotion, and the progress indicator restarts for the new
+level without resetting total XP. Requirements do not depend on the catalog size.
+
+The Progress page lists all 30 ranks, from Cadet to Field Marshal, with total XP
+thresholds. Later levels continue as Field Marshal 2, Field Marshal 3, and so on.
+Ranks measure practice, not CEFR proficiency; A1/A2 labels describe content only.
+
+Historical XP is converted once at 10:1, rounded down, and marked `xpVersion: 2`.
+Account progress upgrades on read and is persisted with the next save; guest
+progress upgrades in browser storage. Word counts, mastery, and answer history
+are preserved. Old open tabs must reload before saving under the new XP rules.
 
 ## Authentication and deployment status
 
@@ -78,6 +100,11 @@ The authentication suite runs in Cloudflare's local Workers runtime with D1.
 It exercises password policy, normalized emails, failed login, session cookies,
 expiry/revocation, CSRF rejection, forged identity headers, account isolation,
 stale progress revisions and persistent rate limits.
+
+GitHub Actions runs lint, typecheck, tests, and a production build on pushes and
+pull requests. You can also run **Build and tests** manually from the **Actions**
+tab. The workflow uses Node.js 22 and the pnpm version in `package.json`, with
+cached dependencies and a frozen lockfile. It needs no Cloudflare credentials.
 
 ## Deploy to your own Cloudflare account
 
@@ -151,6 +178,7 @@ and [CPU limits](https://developers.cloudflare.com/workers/platform/limits/#cpu-
 
 - `public/app.js`: curriculum, exercises and client progress handling.
 - `public/vocabulary.js`: shared vocabulary catalog with permanent word IDs and parts of speech.
+- `public/levels.js`: XP rewards, rank thresholds and legacy XP conversion.
 - `public/styles.css`: interface styles.
 - `app/page.tsx` and `app/sign-in/page.tsx`: app shell and account form.
 - `app/api/progress/route.ts`: authenticated progress endpoint.

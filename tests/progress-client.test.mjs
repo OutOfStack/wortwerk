@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFile } from 'node:fs/promises';
 import { WORDS } from '../public/vocabulary.js';
+import * as levels from '../public/levels.js';
 
-const source = (await readFile('public/app.js', 'utf8')).replace(/^import \{ WORDS \} from '\.\/vocabulary\.js';\n/, '');
-const empty = () => ({ xp: 0, answered: 0, correct: 0, wordMastery: {}, ruleMastery: {}, streak: 1, sound: true, activity: [0,0,0,0,0,0,0] });
+const source = (await readFile('public/app.js', 'utf8')).replace(/^import .* from '\.\/(vocabulary|levels)\.js';\n/gm, '');
+const empty = () => ({ xp: 0, xpVersion: 2, answered: 0, correct: 0, wordMastery: {}, ruleMastery: {}, streak: 1, sound: true, activity: [0,0,0,0,0,0,0] });
 const user = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', email: 'alice@example.test' };
 const response = (body, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
 const settle = () => new Promise(resolve => setImmediate(resolve));
@@ -135,12 +136,13 @@ test('vocabulary feedback always shows the full German word and translation', as
     }
   }
 });
-function boot(fetch) {
+function boot(fetch, guestProgress = { ...empty(), xp: 555 }) {
   const elements = new Map();
-  const element = () => ({ textContent: '', innerHTML: '', classList: { add() {}, remove() {}, toggle() {} }, replaceChildren() {}, append() {} });
-  const storage = new Map([['wortwerk-progress', JSON.stringify({ ...empty(), xp: 99999 })], ['wortwerk-guest-progress', JSON.stringify({ ...empty(), xp: 555 })]]);
+  const element = () => ({ textContent: '', innerHTML: '', classList: { add() {}, remove() {}, toggle() {} }, style: { setProperty() {} }, setAttribute() {}, replaceChildren() {}, append() {} });
+  const storage = new Map([['wortwerk-progress', JSON.stringify({ ...empty(), xp: 99999 })], ['wortwerk-guest-progress', JSON.stringify(guestProgress)]]);
   const context = vm.createContext({
     structuredClone, setTimeout, clearTimeout, fetch,
+    ...levels,
     document: { querySelector: s => { if (!elements.has(s)) elements.set(s, element()); return elements.get(s); }, querySelectorAll: () => [], createElement: element },
     localStorage: { getItem: k => storage.get(k), setItem: (k, v) => storage.set(k, v) },
     window: { addEventListener() {} }, location: { assign() {} },
@@ -202,4 +204,55 @@ test('an account-switch conflict preserves unsaved work and stops further writes
   assert.match(app.elements.get('#syncStatus').textContent, /unsaved progress remains/);
   await app.evaluate('flushProgress()');
   assert.equal(posts, 1);
+});
+
+test('correct words earn 1 XP, correct grammar earns 2, and mistakes or double submissions earn nothing', async () => {
+  const app = boot(async () => response({ user: null }));
+  await settle();
+  app.evaluate("state=structuredClone(defaultState);session={type:'words',pool:[WORDS[2]],items:[WORDS[2]],index:0,roundCorrect:0,current:{kind:'type',answer:WORDS[2].de,word:WORDS[2]}}");
+  app.evaluate("answer('kaese');answer('kaese')");
+  assert.equal(app.evaluate('state.xp'), 1);
+  app.evaluate('finishSession()');
+  assert.match(app.elements.get('#content').innerHTML, /<strong>\+1<\/strong><small>XP earned/);
+  app.evaluate("session.locked=false;answer('Brot')");
+  assert.equal(app.evaluate('state.xp'), 1);
+  app.evaluate("session={type:'grammar',rule:RULES[0],items:RULES[0].qs,index:0,roundCorrect:0,current:{answer:'bin'}};answer('bin');answer('bin')");
+  assert.equal(app.evaluate('state.xp'), 3);
+  app.evaluate("session.locked=false;answer('bist')");
+  assert.equal(app.evaluate('state.xp'), 3);
+  app.evaluate('finishSession()');
+  assert.match(app.elements.get('#content').innerHTML, /<strong>\+2<\/strong><small>XP earned/);
+  assert.equal(JSON.parse(app.storage.get('wortwerk-guest-progress')).xpVersion, 2);
+});
+
+test('sidebar promotes at the threshold and shows remaining progress in the new level', async () => {
+  const app = boot(async () => response({ user: null }));
+  await settle();
+  app.evaluate('state.xp=30;updateChrome()');
+  assert.equal(app.elements.get('#levelNumber').textContent, 2);
+  assert.equal(app.elements.get('#rankName').textContent, 'Senior Cadet');
+  assert.equal(app.elements.get('#rankProgress').textContent, '0 / 45 XP · Level 2');
+  app.evaluate('state.xp=75;renderProgress()');
+  assert.match(app.elements.get('#content').innerHTML, /Practice rank · Level 3/);
+  assert.match(app.elements.get('#content').innerHTML, /68 XP to/);
+  assert.match(app.elements.get('#content').innerHTML, /Level 30 · Field Marshal/);
+});
+
+test('old guest and account XP upgrades once while retaining learning progress', async () => {
+  const legacy = { ...empty(), xp: 508, wordCorrectCounts: { '0': 8 }, ruleMastery: { sein: 85 } };
+  delete legacy.xpVersion;
+  const guest = boot(async () => response({ user: null }), legacy);
+  await settle();
+  assert.equal(guest.evaluate('state.xp'), 50);
+  const saved = JSON.parse(guest.storage.get('wortwerk-guest-progress'));
+  assert.equal(saved.xpVersion, 2);
+  assert.deepEqual(saved.wordCorrectCounts, legacy.wordCorrectCounts);
+  assert.deepEqual(saved.ruleMastery, legacy.ruleMastery);
+  const reloaded = boot(async () => response({ user: null }), saved);
+  await settle();
+  assert.equal(reloaded.evaluate('state.xp'), 50);
+  const account = boot(async path => response(path === '/api/auth/me' ? { user } : { userId: user.id, progress: legacy, revision: 4 }));
+  await settle();
+  assert.equal(account.evaluate('state.xp'), 50);
+  assert.equal(account.evaluate('state.xpVersion'), 2);
 });

@@ -12,7 +12,7 @@ const { Miniflare } = wranglerRequire('miniflare');
 const { build } = wranglerRequire('esbuild');
 const origin = 'https://wortwerk.test';
 const password = 'Blue-Coffee9!';
-const progress = { xp: 10, answered: 1, correct: 1, wordMastery: { '0': 35 }, ruleMastery: {}, streak: 1, sound: true, activity: [1,0,0,0,0,0,0] };
+const progress = { xp: 1, xpVersion: 2, answered: 1, correct: 1, wordMastery: { '0': 35 }, ruleMastery: {}, streak: 1, sound: true, activity: [1,0,0,0,0,0,0] };
 
 test('accounts, password policy, protected progress, rate limits and revocable sessions in Workers', async () => {
   const output = await build({ entryPoints: ['tests/auth-worker.ts'], bundle: true, write: false, format: 'esm', platform: 'node', target: 'es2022' });
@@ -95,5 +95,16 @@ test('accounts, password policy, protected progress, rate limits and revocable s
     for (const key of ['wordMastery', 'wordCorrectCounts']) {
       assert.equal((await call('/api/progress', { ...save, revision: 3, progress: { ...expandedProgress, [key]: { '999999': 1 } } }, a.cookie)).response.status, 400, 'unknown word IDs remain invalid');
     }
+
+    const legacyProgress = { ...expandedProgress, xp: 508 };
+    delete legacyProgress.xpVersion;
+    await db.prepare('UPDATE learner_progress SET payload = ? WHERE user_id = ?').bind(JSON.stringify(legacyProgress), a.result.user.id).run();
+    const upgraded = (await call('/api/progress', undefined, a.cookie)).result;
+    assert.equal(upgraded.progress.xp, 50);
+    assert.equal(upgraded.progress.xpVersion, 2);
+    assert.deepEqual(upgraded.progress.wordCorrectCounts, expandedProgress.wordCorrectCounts);
+    assert.equal((await call('/api/progress', { ...save, revision: 3, progress: legacyProgress }, a.cookie)).response.status, 409, 'outdated clients must reload instead of saving old XP rewards');
+    assert.equal((await call('/api/progress', { ...save, revision: 3, progress: upgraded.progress }, a.cookie)).response.status, 200);
+    assert.equal((await call('/api/progress', undefined, a.cookie)).result.progress.xp, 50, 'saved current XP must not be rescaled again');
   } finally { await mf.dispose(); }
 });

@@ -1,20 +1,27 @@
 import { z } from 'zod';
 import { failure, getUser, guardMutation, HttpError, json, readJson } from './auth';
 import { WORDS } from '../public/vocabulary';
+import { upgradeProgress, XP_VERSION } from '../public/levels';
 
 const score = z.number().int().min(0).max(100);
 const counter = z.number().int().min(0).max(1_000_000_000);
 const wordIds = new Set(WORDS.map(word => String(word.id)));
 const wordId = z.string().refine(id => wordIds.has(id));
 const rules = ['sein', 'present', 'articles', 'accusative', 'modal', 'wordorder', 'perfect', 'dative', 'because', 'comparative'];
-export const progressSchema = z.object({
-  xp: counter, answered: counter, correct: counter,
+const consistent = (data: { correct: number; answered: number }) => data.correct <= data.answered;
+// xpVersion is a protocol marker rather than learner data, so it is checked separately.
+const progressFields = z.object({
+  xp: counter, xpVersion: z.literal(XP_VERSION).optional(), answered: counter, correct: counter,
   wordMastery: z.record(wordId, score),
   wordCorrectCounts: z.record(wordId, z.number().int().min(0).max(8)).default({}),
   ruleMastery: z.record(z.string().refine(key => rules.includes(key)), score),
   streak: counter, sound: z.boolean(), activity: z.array(counter).length(7),
-}).strict().refine(data => data.correct <= data.answered);
-const payloadSchema = z.object({ userId: z.string().uuid(), revision: counter, progress: progressSchema }).strict();
+}).strict();
+// Old stored progress is upgraded on read and persisted with its next save.
+export const progressSchema = progressFields.refine(consistent).transform(upgradeProgress);
+const payloadSchema = z.object({ userId: z.string().uuid(), revision: counter,
+  progress: progressFields.refine(consistent),
+}).strict();
 
 export async function progressGet(db: D1Database, request: Request) {
   try {
@@ -31,7 +38,12 @@ export async function progressPost(db: D1Database, request: Request) {
     guardMutation(request);
     const user = await getUser(db, request);
     if (!user) throw new HttpError(401, 'Please sign in to save your progress.');
-    const parsed = payloadSchema.safeParse(await readJson(request, 32_768));
+    const body = await readJson(request, 32_768);
+    const sent = (body as { progress?: { xpVersion?: unknown } } | null)?.progress;
+    if (sent && typeof sent === 'object' && sent.xpVersion !== XP_VERSION) {
+      throw new HttpError(409, 'The XP system has changed. Reload this page before saving progress.');
+    }
+    const parsed = payloadSchema.safeParse(body);
     if (!parsed.success) throw new HttpError(400, 'Invalid progress data.');
     const { userId, revision, progress } = parsed.data;
     if (userId !== user.id) throw new HttpError(409, 'The signed-in account changed. Reload before continuing.');
