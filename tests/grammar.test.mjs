@@ -8,7 +8,7 @@ import { upgradeProgress } from '../public/levels.js';
 test('every grammar rule has its configured number of distinct exercises with one answer option', () => {
   assert.deepEqual(RULES.map(rule => rule.id), RULE_IDS);
   assert.equal(RULES.length, 24);
-  assert.equal(RULES.reduce((count, rule) => count + rule.qs.length, 0), 892);
+  assert.equal(RULES.reduce((count, rule) => count + rule.qs.length, 0), 1500);
   for (const rule of RULES) {
     assert.equal(rule.qs.length, ruleTarget(rule.id).size, rule.id);
     assert.equal(new Set(rule.qs.map(([prompt]) => prompt)).size, ruleTarget(rule.id).size, rule.id);
@@ -102,7 +102,7 @@ test('grammar migration preserves current XP and word counts without fabricating
   const old = { xp: 157, xpVersion: 2, ruleMastery: { sein: 95 }, wordCorrectCounts: { 0: 8 } };
   const upgraded = upgradeProgress(old);
   assert.equal(upgraded.xp, 157);
-  assert.equal(upgraded.grammarVersion, 2);
+  assert.equal(upgraded.grammarVersion, 3);
   assert.deepEqual(upgraded.grammarProgress, {});
   assert.deepEqual(upgraded.wordCorrectCounts, old.wordCorrectCounts);
   assert.equal('ruleMastery' in upgraded, false);
@@ -114,7 +114,7 @@ test('grammar migration preserves current XP and word counts without fabricating
 test('old 80-answer windows shrink without losing XP, attempts or earned completion', () => {
   const old = { xp: 99, xpVersion: 2, grammarVersion: 1, grammarProgress: {
     sein: { answers: [...Array(48).fill(true), ...Array(32).fill(false)], attempts: 95, passed: true },
-    plural: { answers: [...Array(45).fill(false), ...Array(35).fill(true)], attempts: 80, passed: false },
+    indefinite: { answers: [...Array(45).fill(false), ...Array(35).fill(true)], attempts: 80, passed: false },
   } };
   const upgraded = upgradeProgress(old);
   assert.equal(upgraded.xp, 99);
@@ -122,8 +122,8 @@ test('old 80-answer windows shrink without losing XP, attempts or earned complet
   assert.equal(upgraded.grammarProgress.sein.attempts, 95);
   assert.equal(upgraded.grammarProgress.sein.passed, true);
   assert.equal(grammarStatus(upgraded.grammarProgress.sein, 'sein').next, 31);
-  assert.equal(upgraded.grammarProgress.plural.answers.length, 40);
-  assert.equal(upgraded.grammarProgress.plural.passed, true, 'the retained 35 of 40 qualifies');
+  assert.equal(upgraded.grammarProgress.indefinite.answers.length, 40);
+  assert.equal(upgraded.grammarProgress.indefinite.passed, true, 'the retained 35 of 40 qualifies');
   assert.deepEqual(upgradeProgress(upgraded), upgraded);
   assert.equal(old.grammarProgress.sein.answers.length, 80);
 });
@@ -139,4 +139,31 @@ test('new topics cover direction, separation, reflexive cases, participles and c
   assert.equal(answerFor('participle', 'Choose the Partizip II of “studieren”.'), 'studiert');
   assert.equal(answerFor('countable', 'Ich sehe ___ Bücher. (many individual objects)'), 'viele');
   assert.equal(answerFor('countable', 'Wir haben ___ Wasser. (a lot of the substance, not portions)'), 'viel');
+  assert.equal(answerFor('separable', 'Ich weiß, dass du abends ___. (fernsehen)'), 'fernsiehst');
+  assert.equal(answerFor('reflexive', 'Wir ärgern ___ über den Lärm. (reflexive)'), 'uns');
+  assert.equal(answerFor('reflexive', 'Du merkst ___ die Adresse. (you memorize it)'), 'dir');
+  assert.equal(answerFor('participle', 'Ich bin nach Berlin ___. (fahren, Perfekt)'), 'gefahren');
+  assert.equal(answerFor('participle', 'Ich habe Medizin ___. (studieren, Perfekt)'), 'studiert');
+});
+
+test('expanded topics retain short histories and earned passes while unpassed histories fill to 80', () => {
+  const old = { xp: 123, xpVersion: 2, grammarVersion: 2, grammarProgress: {
+    present: { answers: Array(48).fill(true), attempts: 48, passed: true },
+    perfect: { answers: [...Array(6).fill(false), ...Array(34).fill(true)], attempts: 120, passed: false },
+  } };
+  const upgraded = upgradeProgress(old);
+  assert.equal(upgraded.grammarVersion, 3);
+  assert.equal(upgraded.xp, old.xp);
+  assert.deepEqual(upgraded.grammarProgress, old.grammarProgress);
+  assert.deepEqual(upgradeProgress(upgraded), upgraded);
+  let growing = upgraded.grammarProgress.perfect;
+  for (let i = 0; i < 39; i++) growing = recordGrammarAnswer(growing, true, 'perfect');
+  assert.equal(growing.answers.length, 79);
+  assert.equal(growing.passed, false, 'even 73 correct needs a complete window');
+  growing = recordGrammarAnswer(growing, true, 'perfect');
+  assert.equal(growing.answers.length, 80);
+  assert.equal(growing.passed, true);
+  assert.equal(growing.attempts, 160);
+  assert.equal(recordGrammarAnswer(growing, true, 'perfect').answers.filter(Boolean).length, 75);
+  assert.equal(recordGrammarAnswer(upgraded.grammarProgress.present, false, 'present').passed, true);
 });

@@ -13,7 +13,7 @@ const { Miniflare } = wranglerRequire('miniflare');
 const { build } = wranglerRequire('esbuild');
 const origin = 'https://wortwerk.test';
 const password = 'Blue-Coffee9!';
-const progress = { xp: 1, xpVersion: 2, answered: 1, correct: 1, wordMastery: { '0': 35 }, grammarVersion: 2, grammarProgress: {}, streak: 1, sound: true, activity: [1,0,0,0,0,0,0] };
+const progress = { xp: 1, xpVersion: 2, vocabularyVersion: 1, knownWordIds: [], answered: 1, correct: 1, wordMastery: { '0': 35 }, grammarVersion: 3, grammarProgress: {}, streak: 1, sound: true, activity: [1,0,0,0,0,0,0] };
 
 test('accounts, password policy, protected progress, rate limits and revocable sessions in Workers', async () => {
   const output = await build({ entryPoints: ['tests/auth-worker.ts'], bundle: true, write: false, format: 'esm', platform: 'node', target: 'es2022' });
@@ -105,7 +105,7 @@ test('accounts, password policy, protected progress, rate limits and revocable s
     const upgraded = (await call('/api/progress', undefined, a.cookie)).result;
     assert.equal(upgraded.progress.xp, 50);
     assert.equal(upgraded.progress.xpVersion, 2);
-    assert.equal(upgraded.progress.grammarVersion, 2);
+    assert.equal(upgraded.progress.grammarVersion, 3);
     assert.deepEqual(upgraded.progress.grammarProgress, {});
     assert.equal('ruleMastery' in upgraded.progress, false);
     assert.deepEqual(upgraded.progress.wordCorrectCounts, expandedProgress.wordCorrectCounts);
@@ -138,12 +138,13 @@ test('accounts, password policy, protected progress, rate limits and revocable s
     assert.deepEqual((await call('/api/progress', undefined, a.cookie)).result.progress.grammarProgress, passedProgress.grammarProgress);
     const allRulesProgress = {
       ...passedProgress, answered: RULE_IDS.reduce((sum, id) => sum + ruleTarget(id).size, 0), correct: RULE_IDS.reduce((sum, id) => sum + ruleTarget(id).target, 0),
+      knownWordIds: WORDS.map(word => String(word.id)),
       grammarProgress: Object.fromEntries(RULE_IDS.map(id => [id, {
         answers: Array.from({ length: ruleTarget(id).size }, (_, i) => i < ruleTarget(id).target), attempts: ruleTarget(id).size, passed: true,
       }])),
     };
     const allRulesPayload = { ...save, revision: 6, progress: allRulesProgress };
-    assert.ok(Buffer.byteLength(JSON.stringify(allRulesPayload)) < 32_768, 'all grammar histories and vocabulary must fit the save limit');
+    assert.ok(Buffer.byteLength(JSON.stringify(allRulesPayload)) < 65_536, 'all grammar histories and vocabulary must fit the save limit');
     assert.equal((await call('/api/progress', allRulesPayload, a.cookie)).response.status, 200);
     assert.deepEqual((await call('/api/progress', undefined, a.cookie)).result.progress, allRulesProgress, 'all added topics retain their histories and passed status');
     const oldWindowProgress = { ...allRulesProgress, grammarVersion: 1, grammarProgress: {
@@ -151,7 +152,7 @@ test('accounts, password policy, protected progress, rate limits and revocable s
     } };
     await db.prepare('UPDATE learner_progress SET payload = ? WHERE user_id = ?').bind(JSON.stringify(oldWindowProgress), a.result.user.id).run();
     const shortened = (await call('/api/progress', undefined, a.cookie)).result.progress;
-    assert.equal(shortened.grammarVersion, 2);
+    assert.equal(shortened.grammarVersion, 3);
     assert.equal(shortened.xp, oldWindowProgress.xp);
     assert.equal(shortened.grammarProgress.sein.answers.length, size);
     assert.equal(shortened.grammarProgress.sein.attempts, 95);
@@ -159,6 +160,39 @@ test('accounts, password policy, protected progress, rate limits and revocable s
     assert.equal((await call('/api/progress', { ...save, revision: 7, progress: oldWindowProgress }, a.cookie)).response.status, 409);
     assert.equal((await call('/api/progress', { ...save, revision: 7, progress: shortened }, a.cookie)).response.status, 200);
     assert.deepEqual((await call('/api/progress', undefined, a.cookie)).result.progress, shortened);
+
+    const smallerWindows = { ...allRulesProgress, grammarVersion: 2, grammarProgress: {
+      present: { answers: Array(48).fill(true), attempts: 48, passed: true },
+      perfect: { answers: [...Array(6).fill(false), ...Array(34).fill(true)], attempts: 120, passed: false },
+    } };
+    await db.prepare('UPDATE learner_progress SET payload = ? WHERE user_id = ?').bind(JSON.stringify(smallerWindows), a.result.user.id).run();
+    const expanded = (await call('/api/progress', undefined, a.cookie)).result.progress;
+    assert.equal(expanded.grammarVersion, 3);
+    assert.deepEqual(expanded.grammarProgress, smallerWindows.grammarProgress, 'expansion preserves real histories and past achievements');
+    assert.equal((await call('/api/progress', { ...save, revision: 8, progress: smallerWindows }, a.cookie)).response.status, 409, 'old tabs must reload the larger exercise sets');
+    assert.equal((await call('/api/progress', { ...save, revision: 8, progress: expanded }, a.cookie)).response.status, 200, 'short migrated histories can still be saved');
+    assert.deepEqual((await call('/api/progress', undefined, a.cookie)).result.progress, expanded);
+    const growing = { ...expanded, grammarProgress: { ...expanded.grammarProgress, perfect: {
+      ...expanded.grammarProgress.perfect, answers: [...expanded.grammarProgress.perfect.answers, true], attempts: 121,
+    } } };
+    assert.equal((await call('/api/progress', { ...save, revision: 9, progress: growing }, a.cookie)).response.status, 200);
+    assert.deepEqual((await call('/api/progress', undefined, a.cookie)).result.progress, growing, 'partially filled larger windows survive a save and reload');
+
+    for (const knownWordIds of [['10000'], ['0', '0'], [0], '0']) {
+      assert.equal((await call('/api/progress', { ...save, revision: 10, progress: { ...growing, knownWordIds } }, a.cookie)).response.status, 400, 'known words must be unique valid string IDs');
+    }
+    const oldVocabulary = { ...growing };
+    delete oldVocabulary.vocabularyVersion;
+    delete oldVocabulary.knownWordIds;
+    assert.equal((await call('/api/progress', { ...save, revision: 10, progress: oldVocabulary }, a.cookie)).response.status, 409, 'old tabs cannot erase exclusions');
+    const restoredWord = { ...growing, knownWordIds: growing.knownWordIds.filter(id => id !== '999') };
+    assert.equal((await call('/api/progress', { ...save, revision: 10, progress: restoredWord }, a.cookie)).response.status, 200);
+    assert.deepEqual((await call('/api/progress', undefined, a.cookie)).result.progress.knownWordIds, restoredWord.knownWordIds);
+    await db.prepare('UPDATE learner_progress SET payload = ? WHERE user_id = ?').bind(JSON.stringify(oldVocabulary), a.result.user.id).run();
+    const migratedVocabulary = (await call('/api/progress', undefined, a.cookie)).result.progress;
+    assert.equal(migratedVocabulary.vocabularyVersion, 1);
+    assert.deepEqual(migratedVocabulary.knownWordIds, []);
+    assert.equal(migratedVocabulary.xp, growing.xp);
 
 
   } finally { await mf.dispose(); }

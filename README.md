@@ -6,9 +6,10 @@ An early German A1–A2 practice app with English instructions.
 
 - German → English multiple-choice vocabulary exercises.
 - English → German typed recall and letter-building exercises.
-- 295 vocabulary entries across 17 topics and 24 grammar topics with 20–48 exercises each.
+- 1,000 vocabulary entries across 24 topics and 24 grammar topics with 20–80 exercises each.
 - Randomized multiple-choice answers use the same part of speech, preferring the same topic and level.
 - Per-word progress: eight correct answers retire a word from normal practice.
+- “I know this” hides a word without awarding XP; restore it under Progress → Words marked known.
 - Vocabulary accepts optional articles, capitalization and alternative umlaut spellings.
 - Grammar completion at a topic-specific rolling target of at least 87.5%, with saved exercise positions.
 - Grammar theory, translated examples, tables and common mistakes.
@@ -40,6 +41,32 @@ Account progress upgrades on read and is persisted with the next save; guest
 progress upgrades in browser storage. Word counts, mastery, and answer history
 are preserved. Old open tabs must reload before saving under the new XP rules.
 
+## Vocabulary coverage and known words
+
+The catalog contains 1,000 independently curated everyday entries, including noun
+articles, English meanings, topics and parts of speech. The original 295 IDs are
+unchanged. New topics include education, technology, nature, colors, numbers,
+pronouns and prepositions. A1/A2 tags are learning guidance, not an official
+word-by-word exam classification or a corpus frequency ranking.
+
+For comparison, the [official Goethe A2 vocabulary guide](https://www.goethe.de/pro/relaunch/prf/vi/Goethe-Zertifikat_A2_Wortliste.pdf)
+describes roughly 1,300 lexical items that candidates should at least understand.
+This catalog is a practice foundation, not the complete official exam list.
+The [A2 exam](https://www.goethe.de/ins/de/en/prf/prf/gzsd2.html) also assesses
+listening, reading, writing and speaking.
+
+“I know this” is available in all three vocabulary exercise modes. It excludes
+the word from future practice, saves immediately, and does not change XP, correct
+answer counts, accuracy or activity. Skipped words are excluded from round
+accuracy. Progress → Words marked known lets you restore a word with its earlier
+practice count intact. Guest exclusions remain on the device; signed-in exclusions
+belong to the account and sync through D1.
+
+`vocabularyVersion: 1` prevents older open tabs from overwriting the new
+`knownWordIds` field. Existing progress loads with an empty exclusion list. The
+progress request limit is 64 KiB to accommodate all 1,000 word records, known IDs,
+and all grammar histories together.
+
 ## Grammar completion
 
 Topics include verb conjugation, causal clauses, plural forms, indefinite articles,
@@ -50,7 +77,8 @@ a combined topic. The Partizip II topic focuses on formation alongside the
 existing Perfekt topic. Existing conjugation and weil/dass rules keep their
 progress IDs rather than creating duplicate rules.
 
-Topic lengths follow their scope, with repetitive variants removed. Each topic’s
+Broad topics have 80 exercises for repeated practice across forms and contexts;
+narrower topics keep 20–40 exercises. Each topic’s
 window equals its exercise count. The passing target is `ceil(count × 7 / 8)`:
 
 | Exercises | Correct to pass |
@@ -59,16 +87,18 @@ window equals its exercise count. The passing target is `ceil(count × 7 / 8)`:
 | 24 | 21 |
 | 32 | 28 |
 | 40 | 35 |
-| 48 | 42 |
+| 80 | 70 |
 
 Complete a full window before passing. After the last exercise, continuing returns
 to exercise 1 without clearing the score: each new answer replaces the oldest.
 A topic can pass partway through a later cycle. Passed status stays earned.
 
 The recent outcomes, total attempts and passed status are saved for guests and
-accounts. Leaving or reloading resumes at the next exercise. `grammarVersion: 2`
-trims old 80-answer histories to the new window, preserves attempts and earned
-passes, and evaluates the retained answers against the new target. XP and word
+accounts. Leaving or reloading resumes at the next exercise. `grammarVersion: 3`
+preserves recorded answers, attempts and earned passes when topics grow. Shorter
+histories fill up naturally as new answers arrive; no outcomes are fabricated.
+Unpassed topics require the full new window. Older 80-answer histories are trimmed
+only for topics that still use a smaller window. XP and word
 progress stay intact. Old percentage-only scores cannot reconstruct answer
 histories, so those start fresh. Old tabs must reload before saving.
 
@@ -216,7 +246,7 @@ and [CPU limits](https://developers.cloudflare.com/workers/platform/limits/#cpu-
 - `public/app.js`: curriculum, exercises and client progress handling.
 - `public/vocabulary.js`: shared vocabulary catalog with permanent word IDs and parts of speech.
 - `public/levels.js`: XP rewards, rank thresholds and legacy XP conversion.
-- `public/grammar.js`: 892 grammar exercises across 24 topics.
+- `public/grammar.js`: 1,500 grammar exercises across 24 topics.
 - `public/grammar-config.js`: topic sizes and passing targets shared by client and server.
 - `public/grammar-more.js`: local adverbs, separable/reflexive verbs, participles and countability.
 - `public/grammar-topics.js`: additional foundational topic exercises and explanations.

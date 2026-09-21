@@ -192,10 +192,15 @@ export const RULES = [
   { id: 'dative', level: 'A2', title: 'Dative case', desc: 'Indirect objects, prepositions and locations', tip: 'Dative articles: dem / der / dem. Use dative after helfen, for recipients with geben, after mit / bei / zu / aus / von, and for static locations.' },
   { id: 'because', level: 'A2', title: 'Kausalsätze & dass', desc: 'Reasons with weil; statements with dass', tip: 'After weil or dass, put the conjugated verb at the end.' },
   { id: 'comparative', level: 'A2', title: 'Komparativ & Superlativ', desc: 'größer, besser, am besten', tip: 'Use the comparative with als, and am + superlative for the highest degree.' },
-].map(rule => ({ ...rule, qs: banks[rule.id].filter((_, i) => ({
+].map(rule => {
+  const retained = (_, i) => ({
   sein: i < 32, present: i < 48, articles: i < 48,
   accusative: i % 4 < 2, modal: i < 16 || (i >= 32 && i < 48) || (i >= 56 && i < 72),
   wordorder: i % 4 < 2, perfect: i % 4 === 0 || i % 4 === 2,
   dative: i % 4 === 0 || i % 4 === 2, because: i % 4 === 0 || i % 4 === 2,
   comparative: i % 4 >= 2,
-})[rule.id]) })).concat(EXTRA_RULES, MORE_RULES);
+  })[rule.id];
+  const previous = banks[rule.id].filter(retained);
+  // Keep the existing sequence first so unfinished first cycles resume in place.
+  return { ...rule, qs: rule.id === 'sein' ? previous : previous.concat(banks[rule.id].filter((q, i) => !retained(q, i))) };
+}).concat(EXTRA_RULES, MORE_RULES);

@@ -1,6 +1,7 @@
 // Practice ranks are game milestones, independent of the vocabulary catalog
 // and CEFR proficiency. Keep thresholds stable when adding learning content.
 import { upgradeGrammar } from './grammar-progress.js';
+import { VOCABULARY_VERSION } from './vocabulary.js';
 
 export const XP_REWARDS = { words: 1, grammar: 1 };
 export const XP_VERSION = 2;
@@ -17,7 +18,7 @@ export function rescaleLegacyXp(xp, version) {
 
 // Stored progress is upgraded to the current XP rules exactly once, on read.
 export function upgradeProgress(progress) {
-  return upgradeGrammar({ ...progress, xp: rescaleLegacyXp(progress.xp, progress.xpVersion), xpVersion: XP_VERSION });
+  return upgradeGrammar({ ...progress, vocabularyVersion: VOCABULARY_VERSION, knownWordIds: progress.knownWordIds || [], xp: rescaleLegacyXp(progress.xp, progress.xpVersion), xpVersion: XP_VERSION });
 }
 
 export const RANK_TITLES = [

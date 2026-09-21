@@ -70,6 +70,21 @@ const countNouns = [
 ];
 const massNouns = ['Wasser', 'Milch', 'Mehl', 'Zucker', 'Salz', 'Reis', 'Öl', 'Butter'];
 
+// Sentence practice complements direct participle recall, including auxiliaries
+// supplied in the prompt so this topic still tests participle formation.
+const participleContexts = [
+  'habe Deutsch', 'habe Brot', 'habe eine Pause', 'habe Tennis',
+  'habe Suppe', 'habe Musik', 'habe den Schlüssel', 'habe im Büro',
+  'habe auf die Frage', 'habe auf den Bus', 'habe das Fenster', 'bin nach Berlin',
+  'habe Tee', 'habe einen Apfel', 'habe ein Buch', 'habe einen Brief',
+  'habe einen Film', 'habe die Tasche', 'bin nach Hause', 'bin nach Berlin',
+  'bin zu spät', 'bin zu Hause', 'habe gut', 'habe mit Anna',
+  'habe den Bus', 'habe dem Kind', 'habe das Buch', 'habe an dich',
+  'habe das Museum', 'habe die Rechnung', 'habe eine Geschichte', 'habe das Auto',
+  'bin früh', 'habe im Supermarkt', 'habe Anna', 'habe das Zimmer',
+  'habe Medizin', 'habe mit Paul', 'habe das Fahrrad', 'habe den Garten',
+];
+
 const banks = {
   localadverbs: localAdverbs.map(([prompt, answer, choices]) => q(prompt, answer, choices)),
   separable: separableVerbs.flatMap(([infinitive, prefix, ich, du, context, meaning]) => [
@@ -101,6 +116,32 @@ const banks = {
     ]),
   ],
 };
+
+// Append drills to preserve the existing first-cycle exercise order.
+banks.separable.push(...separableVerbs.flatMap(([infinitive, prefix, ich, du, context, meaning]) => {
+  const plural = infinitive.slice(prefix.length);
+  return [
+    q(`Wir ___ ${context} ${prefix}. (${infinitive})`, plural, [ich, du, infinitive]),
+    q(`Wir ${plural} ${context} ___. (${infinitive})`, prefix, ['auf', 'an', 'ein', 'aus', 'ab', 'mit', 'zu', 'fern'].filter(value => value !== prefix).slice(0, 3)),
+    q(`Du willst ${context} ___. (${meaning})`, infinitive, [`${du} ${prefix}`, `${prefix}${ich}`, `${prefix}${du}`]),
+    q(`Ich weiß, dass du ${context} ___. (${infinitive})`, `${prefix}${du}`, [`${du} ${prefix}`, infinitive, `${prefix}${ich}`]),
+  ];
+}));
+banks.reflexive.push(
+  ...[
+    ['ärger', 'über den Lärm'], ['beschäftig', 'mit Musik'], ['bedank', 'bei Anna'],
+    ['rasier', 'jeden Morgen'], ['dusch', 'nach dem Sport'], ['erhol', 'im Urlaub'],
+  ].flatMap(([stem, context]) => reflexiveSubjects.map(([subject, ending, pronoun]) =>
+    q(`${subject} ${stem}${stem.endsWith('er') && ending === 'en' ? 'n' : ending} ___ ${context}. (reflexive)`, pronoun, ['mich', 'dich', 'sich', 'uns', 'euch']))),
+  q('Ich kaufe ___ ein Buch. (for myself)', 'mir', ['mich', 'dir', 'sich']),
+  q('Du kaufst ___ ein Buch. (for yourself)', 'dir', ['dich', 'mir', 'sich']),
+  q('Ich merke ___ die Adresse. (I memorize it)', 'mir', ['mich', 'dir', 'sich']),
+  q('Du merkst ___ die Adresse. (you memorize it)', 'dir', ['dich', 'mir', 'sich']),
+);
+banks.participle.push(...participles.map(([infinitive, participle], i) => {
+  const stem = infinitive.slice(0, -2);
+  return q(`Ich ${participleContexts[i]} ___. (${infinitive}, Perfekt)`, participle, [infinitive, `${stem}t`, `ge${infinitive}`, `${stem}ten`]);
+}));
 
 export const MORE_RULES = [
   { id: 'localadverbs', level: 'A2', title: 'Lokaladverbien', desc: 'hier, dort, drinnen, hinaus and more', tip: 'Position answers Wo? Direction answers Wohin? Her- points toward the speaker; hin- points away.' },

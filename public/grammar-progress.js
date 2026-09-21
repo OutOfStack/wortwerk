@@ -1,6 +1,6 @@
 import { RULE_IDS, ruleTarget } from './grammar-config.js';
 export { RULE_IDS, ruleTarget } from './grammar-config.js';
-export const GRAMMAR_VERSION = 2;
+export const GRAMMAR_VERSION = 3;
 
 export function grammarStatus(progress, id) {
   const { size, target } = ruleTarget(id);

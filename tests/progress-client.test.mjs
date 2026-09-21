@@ -2,14 +2,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFile } from 'node:fs/promises';
-import { WORDS } from '../public/vocabulary.js';
+import { WORDS, VOCABULARY_VERSION } from '../public/vocabulary.js';
 import * as levels from '../public/levels.js';
 import * as grammar from '../public/grammar-progress.js';
 import { RULES } from '../public/grammar.js';
 import { THEORY } from '../public/grammar-theory.js';
 
 const source = (await readFile('public/app.js', 'utf8')).replace(/^import .* from '\.\/(vocabulary|levels|grammar|grammar-progress|grammar-theory)\.js';\n/gm, '');
-const empty = () => ({ xp: 0, xpVersion: 2, answered: 0, correct: 0, wordMastery: {}, grammarVersion: 2, grammarProgress: {}, streak: 1, sound: true, activity: [0,0,0,0,0,0,0] });
+const empty = () => ({ xp: 0, xpVersion: 2, vocabularyVersion: 1, knownWordIds: [], answered: 0, correct: 0, wordMastery: {}, grammarVersion: 3, grammarProgress: {}, streak: 1, sound: true, activity: [0,0,0,0,0,0,0] });
 const user = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', email: 'alice@example.test' };
 const response = (body, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
 const settle = () => new Promise(resolve => setImmediate(resolve));
@@ -19,11 +19,11 @@ test('expanded vocabulary retains legacy progress identities and has valid uniqu
   for (const { id, de } of legacy) assert.equal(WORDS.find(word => word.id === id)?.de, de);
   assert.equal(new Set(WORDS.map(word => word.id)).size, WORDS.length);
   assert.equal(new Set(WORDS.map(word => word.de)).size, WORDS.length);
-  assert.ok(WORDS.length > legacy.length);
+  assert.equal(WORDS.length, 1000);
   for (const word of WORDS) {
     assert.ok(Number.isInteger(word.id) && word.id >= 0);
     assert.ok(['A1', 'A2'].includes(word.level));
-    assert.ok(['noun', 'verb', 'adjective', 'adverb', 'conjunction'].includes(word.pos));
+    assert.ok(['noun', 'verb', 'adjective', 'adverb', 'conjunction', 'preposition', 'pronoun', 'numeral'].includes(word.pos));
     assert.ok(word.de && word.en && word.topic);
     if (word.pos === 'noun') assert.match(word.de, /^(der|die|das) /);
   }
@@ -55,7 +55,7 @@ test('distractors prefer the topic and level, including verbs inside themed topi
       assert.ok(WORDS.some(other => other.en === option && other.pos === word.pos && other.topic === word.topic && other.level === word.level));
     }
   }
-  const sparse = app.evaluate("wordForm({id:9999,de:'ich',en:'I',pos:'pronoun',topic:'Pronouns',level:'A1'},0)");
+  const sparse = app.evaluate("wordForm({id:9999,de:'ich',en:'I',pos:'interjection',topic:'Sparse',level:'A1'},0)");
   assert.equal(sparse.kind, 'type', 'never pad a small category with unrelated word types');
 });
 
@@ -90,7 +90,7 @@ test('eight correct recalls retire a word, incorrect and duplicate answers do no
   assert.match(app.elements.get('#feedback').innerHTML, /Learned!/);
   app.evaluate('startWords([WORDS[2]])');
   assert.equal(app.evaluate('session'), null);
-  assert.match(app.elements.get('#content').innerHTML, /All words learned/);
+  assert.match(app.elements.get('#content').innerHTML, /All words complete/);
 });
 
 test('saved learned words are excluded after account reload and short rounds keep their selection', async () => {
@@ -105,6 +105,70 @@ test('saved learned words are excluded after account reload and short rounds kee
   app.elements.get('#again').onclick();
   assert.equal(app.evaluate('session.items.length'), 1);
   assert.equal(app.evaluate('session.items[0].id'), 1);
+});
+
+test('I know this works in every vocabulary mode without rewarding or recording an answer', async () => {
+  for (const count of [0, 1, 2]) {
+    const app = boot(async () => response({ user: null }), { ...empty(), wordCorrectCounts: { '0': count } });
+    await settle();
+    app.evaluate('startWords([WORDS[0]])');
+    assert.match(app.elements.get('#content').innerHTML, /I know this/);
+    app.elements.get('#knowWord').onclick();
+    app.evaluate("markWordKnown();answer(session.current.answer)");
+    assert.equal(app.evaluate('state.xp'), 0);
+    assert.equal(app.evaluate('state.answered'), 0);
+    assert.equal(app.evaluate('state.correct'), 0);
+    assert.equal(app.evaluate('state.activity.reduce((a,b)=>a+b,0)'), 0);
+    assert.equal(app.evaluate('wordCorrect(WORDS[0])'), count);
+    assert.equal(app.evaluate('pendingWords([WORDS[0]]).length'), 0);
+    assert.equal(app.evaluate('session.skipped'), 1);
+    const saved = JSON.parse(app.storage.get('wortwerk-guest-progress'));
+    assert.deepEqual(saved.knownWordIds, ['0']);
+    assert.equal(saved.vocabularyVersion, 1);
+    app.elements.get('#next').onclick();
+    assert.match(app.elements.get('#content').innerHTML, /1 marked known without XP/);
+    assert.doesNotMatch(app.elements.get('#content').innerHTML, /NaN|Infinity/);
+    const reloaded = boot(async () => response({ user: null }), saved);
+    await settle();
+    assert.equal(reloaded.evaluate('pendingWords([WORDS[0]]).length'), 0);
+    reloaded.evaluate("restoreWord('0')");
+    assert.equal(reloaded.evaluate('pendingWords([WORDS[0]]).length'), 1);
+    assert.equal(reloaded.evaluate('wordCorrect(WORDS[0])'), count);
+    assert.deepEqual(JSON.parse(reloaded.storage.get('wortwerk-guest-progress')).knownWordIds, []);
+  }
+});
+
+test('known words are account-specific and restoration saves to the account', async () => {
+  const posts = [];
+  const progress = { ...empty(), knownWordIds: ['0', '999'], wordCorrectCounts: { '0': 3 } };
+  const app = boot(async (path, init) => {
+    if (init?.method === 'POST') { posts.push(JSON.parse(init.body)); return response({ saved: true, revision: 5 }); }
+    return response(path === '/api/auth/me' ? { user } : { userId: user.id, progress, revision: 4 });
+  }, { ...empty(), knownWordIds: ['1'] });
+  await settle();
+  assert.equal(app.evaluate('isWordKnown(WORDS[1])'), false, 'guest exclusions never leak into an account');
+  assert.equal(app.evaluate('pendingWords([WORDS[0],WORDS[999]]).length'), 0);
+  app.evaluate('renderProgress()');
+  assert.match(app.elements.get('#content').innerHTML, /Words marked known \(2\)/);
+  assert.match(app.elements.get('#content').innerHTML, /data-restore-word="999"/);
+  app.evaluate("restoreWord('0')");
+  await settle();
+  assert.deepEqual(posts[0].progress.knownWordIds, ['999']);
+  assert.equal(posts[0].progress.wordCorrectCounts['0'], 3);
+  assert.equal(app.evaluate('pendingWords([WORDS[0]]).length'), 1);
+});
+
+test('mixed rounds exclude marked-known words from accuracy and reject marking after an answer', async () => {
+  const app = boot(async () => response({ user: null }), empty());
+  await settle();
+  app.evaluate('startWords([WORDS[0],WORDS[1]]);markWordKnown()');
+  app.elements.get('#next').onclick();
+  app.evaluate('answer(session.current.answer);markWordKnown()');
+  assert.equal(app.evaluate('state.knownWordIds.length'), 1);
+  app.elements.get('#next').onclick();
+  assert.match(app.elements.get('#content').innerHTML, /1 of 1 correctly/);
+  assert.match(app.elements.get('#content').innerHTML, /100%/);
+  assert.equal(app.evaluate('state.xp'), 1);
 });
 
 test('vocabulary accepts optional articles, case and alternative umlaut spellings; grammar still checks articles', async () => {
@@ -145,7 +209,7 @@ function boot(fetch, guestProgress = { ...empty(), xp: 555 }) {
   const storage = new Map([['wortwerk-progress', JSON.stringify({ ...empty(), xp: 99999 })], ['wortwerk-guest-progress', JSON.stringify(guestProgress)]]);
   const context = vm.createContext({
     structuredClone, setTimeout, clearTimeout, fetch,
-    ...levels, ...grammar, RULES, THEORY,
+    ...levels, ...grammar, RULES, THEORY, VOCABULARY_VERSION,
     document: { querySelector: s => { if (!elements.has(s)) elements.set(s, element()); return elements.get(s); }, querySelectorAll: () => [], createElement: element },
     localStorage: { getItem: k => storage.get(k), setItem: (k, v) => storage.set(k, v) },
     window: { addEventListener() {} }, location: { assign() {} },
@@ -251,7 +315,7 @@ test('old guest and account XP upgrades once while retaining learning progress',
   assert.equal(saved.xpVersion, 2);
   assert.deepEqual(saved.wordCorrectCounts, legacy.wordCorrectCounts);
   assert.deepEqual(saved.grammarProgress, {});
-  assert.equal(saved.grammarVersion, 2);
+  assert.equal(saved.grammarVersion, 3);
   assert.equal('ruleMastery' in saved, false, 'old percentages cannot reconstruct answer history');
   const reloaded = boot(async () => response({ user: null }), saved);
   await settle();

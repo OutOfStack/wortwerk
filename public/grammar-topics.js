@@ -169,12 +169,17 @@ export const EXTRA_RULES = [
   { id: 'prepositions', level: 'A1', title: 'Präpositionen', desc: 'Time, origin, destination and relationships', tip: 'Use the English cue to choose the relationship. Learn each preposition with its case and context.' },
   { id: 'local', level: 'A2', title: 'Lokalpräpositionen', desc: 'Wo? versus Wohin?', tip: 'With these nine two-way prepositions, location (Wo?) takes dative; a new destination (Wohin?) takes accusative.' },
   { id: 'wquestions', level: 'A1', title: 'W-Fragen', desc: 'wer, was, wo, wann, warum and more', tip: 'Choose the question word that matches the answer. Wer is a subject; wen is accusative; wem is dative.' },
-].map(rule => ({ ...rule, qs: banks[rule.id].filter((_, i) => ({
+].map(rule => {
+  const retained = (_, i) => ({
   plural: i % 2 === 0, indefinite: i % 4 === 0 || i % 4 === 3,
   personal: i % 8 < 2, possessive: i < 48, nominative: i < 32,
   demonstrative: i < 40, prepositions: i % 4 === 0,
   local: i % 4 < 2, wquestions: i % 4 === 0,
-})[rule.id]) }));
+  })[rule.id];
+  const previous = banks[rule.id].filter(retained);
+  const expanded = ['plural', 'possessive', 'demonstrative', 'local'].includes(rule.id);
+  return { ...rule, qs: expanded ? previous.concat(banks[rule.id].filter((q, i) => !retained(q, i))) : previous };
+});
 
 export const EXTRA_THEORY = {
   plural: {

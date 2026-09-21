@@ -71,3 +71,7 @@
 .grammar-score .meta {
   font-weight: 400;
 }
+
+.word-actions{display:flex;align-items:center;gap:12px;margin-top:24px;flex-wrap:wrap}.word-actions span{font-size:13px;color:var(--muted)}.known-words{padding:0;list-style:none}.known-words li{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid var(--line)}.known-words button{flex-shrink:0}@media(max-width:480px){.known-words li{align-items:flex-start;flex-direction:column}.feedback{gap:12px;flex-wrap:wrap}}
+
+.word-section{gap:20px}@media(max-width:760px){.word-section{flex-direction:column;align-items:stretch}.word-section button{align-self:flex-start}}
