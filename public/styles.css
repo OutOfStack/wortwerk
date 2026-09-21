@@ -61,3 +61,13 @@
   .rank-card { padding: 18px; }
   .rank-ladder li { flex-direction: column; gap: 2px; }
 }
+.grammar-score {
+  margin: 12px 0;
+  font-size: 15px;
+  line-height: 1.6;
+  font-weight: 600;
+}
+
+.grammar-score .meta {
+  font-weight: 400;
+}

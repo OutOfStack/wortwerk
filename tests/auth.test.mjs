@@ -4,6 +4,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import { WORDS } from '../public/vocabulary.js';
+import { RULE_IDS, ruleTarget } from '../public/grammar-progress.js';
 
 const require = createRequire(import.meta.url);
 // Wrangler already owns these exact runtime/testing dependencies.
@@ -12,7 +13,7 @@ const { Miniflare } = wranglerRequire('miniflare');
 const { build } = wranglerRequire('esbuild');
 const origin = 'https://wortwerk.test';
 const password = 'Blue-Coffee9!';
-const progress = { xp: 1, xpVersion: 2, answered: 1, correct: 1, wordMastery: { '0': 35 }, ruleMastery: {}, streak: 1, sound: true, activity: [1,0,0,0,0,0,0] };
+const progress = { xp: 1, xpVersion: 2, answered: 1, correct: 1, wordMastery: { '0': 35 }, grammarVersion: 2, grammarProgress: {}, streak: 1, sound: true, activity: [1,0,0,0,0,0,0] };
 
 test('accounts, password policy, protected progress, rate limits and revocable sessions in Workers', async () => {
   const output = await build({ entryPoints: ['tests/auth-worker.ts'], bundle: true, write: false, format: 'esm', platform: 'node', target: 'es2022' });
@@ -96,15 +97,69 @@ test('accounts, password policy, protected progress, rate limits and revocable s
       assert.equal((await call('/api/progress', { ...save, revision: 3, progress: { ...expandedProgress, [key]: { '999999': 1 } } }, a.cookie)).response.status, 400, 'unknown word IDs remain invalid');
     }
 
-    const legacyProgress = { ...expandedProgress, xp: 508 };
+    const legacyProgress = { ...expandedProgress, xp: 508, ruleMastery: { sein: 90 } };
+    delete legacyProgress.grammarVersion;
+    delete legacyProgress.grammarProgress;
     delete legacyProgress.xpVersion;
     await db.prepare('UPDATE learner_progress SET payload = ? WHERE user_id = ?').bind(JSON.stringify(legacyProgress), a.result.user.id).run();
     const upgraded = (await call('/api/progress', undefined, a.cookie)).result;
     assert.equal(upgraded.progress.xp, 50);
     assert.equal(upgraded.progress.xpVersion, 2);
+    assert.equal(upgraded.progress.grammarVersion, 2);
+    assert.deepEqual(upgraded.progress.grammarProgress, {});
+    assert.equal('ruleMastery' in upgraded.progress, false);
     assert.deepEqual(upgraded.progress.wordCorrectCounts, expandedProgress.wordCorrectCounts);
     assert.equal((await call('/api/progress', { ...save, revision: 3, progress: legacyProgress }, a.cookie)).response.status, 409, 'outdated clients must reload instead of saving old XP rewards');
     assert.equal((await call('/api/progress', { ...save, revision: 3, progress: upgraded.progress }, a.cookie)).response.status, 200);
     assert.equal((await call('/api/progress', undefined, a.cookie)).result.progress.xp, 50, 'saved current XP must not be rescaled again');
+    const oldGrammarClient = { ...upgraded.progress };
+    delete oldGrammarClient.grammarVersion;
+    delete oldGrammarClient.grammarProgress;
+    oldGrammarClient.ruleMastery = { sein: 99 };
+    assert.equal((await call('/api/progress', { ...save, revision: 4, progress: oldGrammarClient }, a.cookie)).response.status, 409, 'clients awarding 2 grammar XP must reload');
+
+    const { size, target } = ruleTarget('sein');
+    const answers = Array.from({ length: size }, (_, i) => i > size - target);
+    const grammarProgress = { ...upgraded.progress, answered: size, correct: target - 1, grammarProgress: { sein: { answers, attempts: size, passed: false } } };
+    for (const invalid of [
+      { answers: [...answers, true], attempts: size + 1, passed: false },
+      { answers, attempts: size - 1, passed: false },
+      { answers: [true], attempts: 1, passed: true },
+      { answers: Array(size).fill(true), attempts: size, passed: false },
+      { answers: ['true'], attempts: 1, passed: false },
+    ]) {
+      assert.equal((await call('/api/progress', { ...save, revision: 4, progress: { ...grammarProgress, grammarProgress: { sein: invalid } } }, a.cookie)).response.status, 400);
+    }
+    assert.equal((await call('/api/progress', { ...save, revision: 4, progress: { ...grammarProgress, grammarProgress: { unknown: grammarProgress.grammarProgress.sein } } }, a.cookie)).response.status, 400);
+    assert.equal((await call('/api/progress', { ...save, revision: 4, progress: grammarProgress }, a.cookie)).response.status, 200);
+    assert.deepEqual((await call('/api/progress', undefined, a.cookie)).result.progress.grammarProgress, grammarProgress.grammarProgress, 'all outcomes and the exercise cursor survive a cloud reload');
+    const passedProgress = { ...grammarProgress, answered: size + 1, correct: target, grammarProgress: { sein: { answers: [...answers.slice(1), true], attempts: size + 1, passed: true } } };
+    assert.equal((await call('/api/progress', { ...save, revision: 5, progress: passedProgress }, a.cookie)).response.status, 200);
+    assert.deepEqual((await call('/api/progress', undefined, a.cookie)).result.progress.grammarProgress, passedProgress.grammarProgress);
+    const allRulesProgress = {
+      ...passedProgress, answered: RULE_IDS.reduce((sum, id) => sum + ruleTarget(id).size, 0), correct: RULE_IDS.reduce((sum, id) => sum + ruleTarget(id).target, 0),
+      grammarProgress: Object.fromEntries(RULE_IDS.map(id => [id, {
+        answers: Array.from({ length: ruleTarget(id).size }, (_, i) => i < ruleTarget(id).target), attempts: ruleTarget(id).size, passed: true,
+      }])),
+    };
+    const allRulesPayload = { ...save, revision: 6, progress: allRulesProgress };
+    assert.ok(Buffer.byteLength(JSON.stringify(allRulesPayload)) < 32_768, 'all grammar histories and vocabulary must fit the save limit');
+    assert.equal((await call('/api/progress', allRulesPayload, a.cookie)).response.status, 200);
+    assert.deepEqual((await call('/api/progress', undefined, a.cookie)).result.progress, allRulesProgress, 'all added topics retain their histories and passed status');
+    const oldWindowProgress = { ...allRulesProgress, grammarVersion: 1, grammarProgress: {
+      sein: { answers: Array(80).fill(true), attempts: 95, passed: true },
+    } };
+    await db.prepare('UPDATE learner_progress SET payload = ? WHERE user_id = ?').bind(JSON.stringify(oldWindowProgress), a.result.user.id).run();
+    const shortened = (await call('/api/progress', undefined, a.cookie)).result.progress;
+    assert.equal(shortened.grammarVersion, 2);
+    assert.equal(shortened.xp, oldWindowProgress.xp);
+    assert.equal(shortened.grammarProgress.sein.answers.length, size);
+    assert.equal(shortened.grammarProgress.sein.attempts, 95);
+    assert.equal(shortened.grammarProgress.sein.passed, true);
+    assert.equal((await call('/api/progress', { ...save, revision: 7, progress: oldWindowProgress }, a.cookie)).response.status, 409);
+    assert.equal((await call('/api/progress', { ...save, revision: 7, progress: shortened }, a.cookie)).response.status, 200);
+    assert.deepEqual((await call('/api/progress', undefined, a.cookie)).result.progress, shortened);
+
+
   } finally { await mf.dispose(); }
 });

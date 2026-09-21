@@ -6,11 +6,11 @@ An early German A1–A2 practice app with English instructions.
 
 - German → English multiple-choice vocabulary exercises.
 - English → German typed recall and letter-building exercises.
-- 295 vocabulary entries across 17 topics and 10 grammar modules (five questions per module).
+- 295 vocabulary entries across 17 topics and 24 grammar topics with 20–48 exercises each.
 - Randomized multiple-choice answers use the same part of speech, preferring the same topic and level.
 - Per-word progress: eight correct answers retire a word from normal practice.
 - Vocabulary accepts optional articles, capitalization and alternative umlaut spellings.
-- Repeated grammar rounds with an 85% rolling mastery target.
+- Grammar completion at a topic-specific rolling target of at least 87.5%, with saved exercise positions.
 - Grammar theory, translated examples, tables and common mistakes.
 - XP-based numbered levels with 30 military-inspired ranks and further Marshal ranks.
 - Email/password registration, sign-in, sign-out and account-specific progress in Cloudflare D1.
@@ -22,7 +22,7 @@ tracking need further work.
 ## XP and practice ranks
 
 Each correct vocabulary answer earns **1 XP** and each correct grammar answer
-earns **2 XP**. Incorrect answers earn no XP. A word still retires after eight
+earns **1 XP**. Incorrect answers earn no XP. A word still retires after eight
 correct recalls, so completing a new word earns up to 8 XP.
 
 Level 1 starts at 0 XP. Reaching Level 2 takes 30 XP; each subsequent step costs
@@ -39,6 +39,43 @@ Historical XP is converted once at 10:1, rounded down, and marked `xpVersion: 2`
 Account progress upgrades on read and is persisted with the next save; guest
 progress upgrades in browser storage. Word counts, mastery, and answer history
 are preserved. Old open tabs must reload before saving under the new XP rules.
+
+## Grammar completion
+
+Topics include verb conjugation, causal clauses, plural forms, indefinite articles,
+personal and possessive pronouns, nominative, demonstratives, prepositions, local
+prepositions, W-questions, local adverbs, separable and reflexive verbs,
+Partizip II, and countable/uncountable nouns. Komparativ and Superlativ remain
+a combined topic. The Partizip II topic focuses on formation alongside the
+existing Perfekt topic. Existing conjugation and weil/dass rules keep their
+progress IDs rather than creating duplicate rules.
+
+Topic lengths follow their scope, with repetitive variants removed. Each topic’s
+window equals its exercise count. The passing target is `ceil(count × 7 / 8)`:
+
+| Exercises | Correct to pass |
+| --- | --- |
+| 20 | 18 |
+| 24 | 21 |
+| 32 | 28 |
+| 40 | 35 |
+| 48 | 42 |
+
+Complete a full window before passing. After the last exercise, continuing returns
+to exercise 1 without clearing the score: each new answer replaces the oldest.
+A topic can pass partway through a later cycle. Passed status stays earned.
+
+The recent outcomes, total attempts and passed status are saved for guests and
+accounts. Leaving or reloading resumes at the next exercise. `grammarVersion: 2`
+trims old 80-answer histories to the new window, preserves attempts and earned
+passes, and evaluates the retained answers against the new target. XP and word
+progress stay intact. Old percentage-only scores cannot reconstruct answer
+histories, so those start fresh. Old tabs must reload before saving.
+
+Grammar reference checks: [Goethe-Institut grammar](https://www.goethe.de/ins/de/de/m/prf/grm.html),
+[Goethe-Institut two-way prepositions](https://www.goethe.de/resources/files/pdf134/pdf-spickzettel-wechselprpositionen.pdf),
+and [Lingolia possessives](https://deutsch.lingolia.com/en/grammar/pronouns/possessive-pronouns).
+Exercises and explanations are written for this app.
 
 ## Authentication and deployment status
 
@@ -179,6 +216,12 @@ and [CPU limits](https://developers.cloudflare.com/workers/platform/limits/#cpu-
 - `public/app.js`: curriculum, exercises and client progress handling.
 - `public/vocabulary.js`: shared vocabulary catalog with permanent word IDs and parts of speech.
 - `public/levels.js`: XP rewards, rank thresholds and legacy XP conversion.
+- `public/grammar.js`: 892 grammar exercises across 24 topics.
+- `public/grammar-config.js`: topic sizes and passing targets shared by client and server.
+- `public/grammar-more.js`: local adverbs, separable/reflexive verbs, participles and countability.
+- `public/grammar-topics.js`: additional foundational topic exercises and explanations.
+- `public/grammar-theory.js`: the complete theory catalog.
+- `public/grammar-progress.js`: rolling grammar scores, completion and migration.
 - `public/styles.css`: interface styles.
 - `app/page.tsx` and `app/sign-in/page.tsx`: app shell and account form.
 - `app/api/progress/route.ts`: authenticated progress endpoint.

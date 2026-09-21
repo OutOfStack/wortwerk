@@ -4,9 +4,12 @@ import vm from 'node:vm';
 import { readFile } from 'node:fs/promises';
 import { WORDS } from '../public/vocabulary.js';
 import * as levels from '../public/levels.js';
+import * as grammar from '../public/grammar-progress.js';
+import { RULES } from '../public/grammar.js';
+import { THEORY } from '../public/grammar-theory.js';
 
-const source = (await readFile('public/app.js', 'utf8')).replace(/^import .* from '\.\/(vocabulary|levels)\.js';\n/gm, '');
-const empty = () => ({ xp: 0, xpVersion: 2, answered: 0, correct: 0, wordMastery: {}, ruleMastery: {}, streak: 1, sound: true, activity: [0,0,0,0,0,0,0] });
+const source = (await readFile('public/app.js', 'utf8')).replace(/^import .* from '\.\/(vocabulary|levels|grammar|grammar-progress|grammar-theory)\.js';\n/gm, '');
+const empty = () => ({ xp: 0, xpVersion: 2, answered: 0, correct: 0, wordMastery: {}, grammarVersion: 2, grammarProgress: {}, streak: 1, sound: true, activity: [0,0,0,0,0,0,0] });
 const user = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', email: 'alice@example.test' };
 const response = (body, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
 const settle = () => new Promise(resolve => setImmediate(resolve));
@@ -142,7 +145,7 @@ function boot(fetch, guestProgress = { ...empty(), xp: 555 }) {
   const storage = new Map([['wortwerk-progress', JSON.stringify({ ...empty(), xp: 99999 })], ['wortwerk-guest-progress', JSON.stringify(guestProgress)]]);
   const context = vm.createContext({
     structuredClone, setTimeout, clearTimeout, fetch,
-    ...levels,
+    ...levels, ...grammar, RULES, THEORY,
     document: { querySelector: s => { if (!elements.has(s)) elements.set(s, element()); return elements.get(s); }, querySelectorAll: () => [], createElement: element },
     localStorage: { getItem: k => storage.get(k), setItem: (k, v) => storage.set(k, v) },
     window: { addEventListener() {} }, location: { assign() {} },
@@ -206,7 +209,7 @@ test('an account-switch conflict preserves unsaved work and stops further writes
   assert.equal(posts, 1);
 });
 
-test('correct words earn 1 XP, correct grammar earns 2, and mistakes or double submissions earn nothing', async () => {
+test('correct words earn 1 XP, correct grammar earns 1, and mistakes or double submissions earn nothing', async () => {
   const app = boot(async () => response({ user: null }));
   await settle();
   app.evaluate("state=structuredClone(defaultState);session={type:'words',pool:[WORDS[2]],items:[WORDS[2]],index:0,roundCorrect:0,current:{kind:'type',answer:WORDS[2].de,word:WORDS[2]}}");
@@ -217,11 +220,11 @@ test('correct words earn 1 XP, correct grammar earns 2, and mistakes or double s
   app.evaluate("session.locked=false;answer('Brot')");
   assert.equal(app.evaluate('state.xp'), 1);
   app.evaluate("session={type:'grammar',rule:RULES[0],items:RULES[0].qs,index:0,roundCorrect:0,current:{answer:'bin'}};answer('bin');answer('bin')");
-  assert.equal(app.evaluate('state.xp'), 3);
+  assert.equal(app.evaluate('state.xp'), 2);
   app.evaluate("session.locked=false;answer('bist')");
-  assert.equal(app.evaluate('state.xp'), 3);
+  assert.equal(app.evaluate('state.xp'), 2);
   app.evaluate('finishSession()');
-  assert.match(app.elements.get('#content').innerHTML, /<strong>\+2<\/strong><small>XP earned/);
+  assert.match(app.elements.get('#content').innerHTML, /<strong>\+1<\/strong><small>XP earned this visit/);
   assert.equal(JSON.parse(app.storage.get('wortwerk-guest-progress')).xpVersion, 2);
 });
 
@@ -247,7 +250,9 @@ test('old guest and account XP upgrades once while retaining learning progress',
   const saved = JSON.parse(guest.storage.get('wortwerk-guest-progress'));
   assert.equal(saved.xpVersion, 2);
   assert.deepEqual(saved.wordCorrectCounts, legacy.wordCorrectCounts);
-  assert.deepEqual(saved.ruleMastery, legacy.ruleMastery);
+  assert.deepEqual(saved.grammarProgress, {});
+  assert.equal(saved.grammarVersion, 2);
+  assert.equal('ruleMastery' in saved, false, 'old percentages cannot reconstruct answer history');
   const reloaded = boot(async () => response({ user: null }), saved);
   await settle();
   assert.equal(reloaded.evaluate('state.xp'), 50);
@@ -255,4 +260,68 @@ test('old guest and account XP upgrades once while retaining learning progress',
   await settle();
   assert.equal(account.evaluate('state.xp'), 50);
   assert.equal(account.evaluate('state.xpVersion'), 2);
+});
+
+
+test('grammar resumes immediately after the saved answer, including a reload before Continue', async () => {
+  const app = boot(async () => response({ user: null }));
+  await settle();
+  app.evaluate("state=structuredClone(defaultState);startRule('sein');answer(session.current.answer);answer(session.current.answer)");
+  const saved = JSON.parse(app.storage.get('wortwerk-guest-progress'));
+  assert.equal(saved.grammarProgress.sein.attempts, 1);
+  assert.deepEqual(saved.grammarProgress.sein.answers, [true]);
+  assert.equal(saved.xp, 1);
+  const reloaded = boot(async () => response({ user: null }), saved);
+  await settle();
+  reloaded.evaluate("startRule('sein')");
+  assert.equal(reloaded.evaluate('session.index'), 1);
+  assert.match(reloaded.elements.get('#content').innerHTML, /1 \/ 32 correct/);
+  reloaded.evaluate("answer('wrong')");
+  const accountProgress = JSON.parse(reloaded.storage.get('wortwerk-guest-progress'));
+  const accountApp = boot(async path => response(path === '/api/auth/me' ? { user } : { userId: user.id, progress: accountProgress, revision: 4 }));
+  await settle();
+  accountApp.evaluate("startRule('sein')");
+  assert.equal(accountApp.evaluate('session.index'), 2);
+  assert.equal(accountApp.evaluate("ruleStatus('sein').correct"), 1);
+});
+
+test('every grammar topic renders its exercise, theory and saved score', async () => {
+  const app = boot(async () => response({ user: null }));
+  await settle();
+  for (const rule of RULES) {
+    app.evaluate(`startRule(${JSON.stringify(rule.id)})`);
+    const html = app.elements.get('#content').innerHTML;
+    assert.ok(html.includes(`1/${rule.qs.length}`), rule.id);
+    assert.ok(html.includes('Theory &amp; examples'), rule.id);
+    assert.ok(html.includes(`0 / ${rule.qs.length} correct`), rule.id);
+  }
+  app.evaluate('renderGrammar()');
+  assert.equal((app.elements.get('#content').innerHTML.match(/<article class="rule">/g) || []).length, 24);
+});
+
+test('shorter cycles carry their score and can pass on the first answer of a later cycle', async () => {
+  const app = boot(async () => response({ user: null }));
+  await settle();
+  app.evaluate("state=structuredClone(defaultState);startRule('sein')");
+  for (let i = 0; i < 32; i++) {
+    app.evaluate(i < 5 ? "answer('wrong')" : 'answer(session.current.answer)');
+    app.elements.get('#next').onclick();
+  }
+  assert.equal(app.evaluate("ruleStatus('sein').passed"), false);
+  assert.equal(app.evaluate("ruleStatus('sein').correct"), 27);
+  assert.match(app.elements.get('#content').innerHTML, /score carried over/);
+  app.elements.get('#again').onclick();
+  assert.equal(app.evaluate('session.index'), 0);
+  assert.equal(app.evaluate("ruleStatus('sein').correct"), 27);
+  app.evaluate('answer(session.current.answer)');
+  assert.equal(app.evaluate("ruleStatus('sein').correct"), 28);
+  assert.equal(app.evaluate("ruleStatus('sein').passed"), true);
+  assert.equal(app.evaluate('state.xp'), 28);
+  app.elements.get('#next').onclick();
+  assert.match(app.elements.get('#content').innerHTML, /Rule passed!/);
+  assert.equal(app.elements.get('#totalMastery').textContent, '1 grammar rules passed');
+  app.evaluate('renderGrammar()');
+  assert.match(app.elements.get('#content').innerHTML, /A1 · Passed/);
+  assert.match(app.elements.get('#content').innerHTML, /28 \/ 32 correct/);
+  assert.equal(app.evaluate('nextRule().id'), 'present');
 });
