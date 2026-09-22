@@ -4,9 +4,10 @@ An early German A1–A2 practice app with English instructions.
 
 ## What is implemented
 
-- German → English multiple-choice vocabulary exercises.
-- English → German typed recall and letter-building exercises.
-- 1,000 vocabulary entries across 24 topics and 24 grammar topics with 20–80 exercises each.
+- German → English and English → German multiple-choice vocabulary exercises.
+- English → German typed recall, letter-building and noun-article (der/die/das) exercises.
+- 1,172 vocabulary entries across 28 topics and 24 grammar topics with 20–80 exercises per round,
+  drawn from a bank of 2,352 grammar exercises.
 - Randomized multiple-choice answers use the same part of speech, preferring the same topic and level.
 - Per-word progress: eight correct answers retire a word from normal practice.
 - “I know this” hides a word without awarding XP; restore it under Progress → Words marked known.
@@ -15,10 +16,33 @@ An early German A1–A2 practice app with English instructions.
 - Grammar theory, translated examples, tables and common mistakes.
 - XP-based numbered levels with 30 military-inspired ranks and further Marshal ranks.
 - Email/password registration, sign-in, sign-out and account-specific progress in Cloudflare D1.
-- A responsive interface for phones and desktops.
+- Grammar answers by choosing or typing; feedback shows the completed sentence.
+- Keyboard shortcuts: 1–9 answer, Enter continues, typed letters and Backspace
+  in letter-building. Letter tiles also have Undo and Clear.
+- End-of-round review of missed words and sentences.
+- Word search (ignores articles, case and umlaut spelling) with per-word status.
+- Daily streak and a last-7-days chart based on local calendar days.
+- A responsive interface for phones and desktops; answer feedback stays in view.
 
-This is a prototype, not a complete A1/A2 curriculum. Streak and activity
-tracking need further work.
+- Pronunciation through the browser's built-in speech synthesis (German voice).
+
+This is a prototype, not a complete A1/A2 curriculum.
+
+## Pronunciation
+
+Speaker buttons read German aloud with the Web Speech API (`speechSynthesis`):
+no API key, server or audio files. They appear next to German prompts, answer
+feedback, search results, known words, mistake reviews and theory examples.
+English prompts never get a button, so listening cannot reveal a typed answer.
+After each answer the word (with its article) or the completed sentence is read
+automatically; the 🔊/🔇 button in the top bar toggles this and is saved as the
+existing `sound` progress field. Isolated grammar forms are not read out of
+context.
+
+The app prefers a de-DE voice whose name suggests higher quality (online,
+natural or Google voices), then any de-DE voice, then other German variants.
+Quality depends on the device. Speech controls are hidden when the browser has
+no speech synthesis or lists voices but none in German.
 
 ## XP and practice ranks
 
@@ -43,10 +67,11 @@ are preserved. Old open tabs must reload before saving under the new XP rules.
 
 ## Vocabulary coverage and known words
 
-The catalog contains 1,000 independently curated everyday entries, including noun
+The catalog contains 1,172 independently curated everyday entries, including noun
 articles, English meanings, topics and parts of speech. The original 295 IDs are
-unchanged. New topics include education, technology, nature, colors, numbers,
-pronouns and prepositions. A1/A2 tags are learning guidance, not an official
+unchanged, and IDs 1000–1171 were appended. Topics include education, technology,
+nature, colors, numbers, pronouns, prepositions, animals, feelings, question
+words and services (post office and authorities). A1/A2 tags are learning guidance, not an official
 word-by-word exam classification or a corpus frequency ranking.
 
 For comparison, the [official Goethe A2 vocabulary guide](https://www.goethe.de/pro/relaunch/prf/vi/Goethe-Zertifikat_A2_Wortliste.pdf)
@@ -64,8 +89,22 @@ belong to the account and sync through D1.
 
 `vocabularyVersion: 1` prevents older open tabs from overwriting the new
 `knownWordIds` field. Existing progress loads with an empty exclusion list. The
-progress request limit is 64 KiB to accommodate all 1,000 word records, known IDs,
-and all grammar histories together.
+progress request limit is 64 KiB to accommodate all 1,172 word records, known IDs,
+all grammar histories and the activity log together (about 40 KiB at most).
+
+Each word cycles through its eight correct answers as: German → English choice,
+typed recall, letter building, English → German choice, typed recall, article
+choice for nouns (letter building otherwise), German → English choice and typed
+recall.
+
+## Streaks and activity
+
+`activityLog` stores answers per local calendar day (`YYYY-MM-DD`) for the latest
+60 days. The first answer of a day extends the streak if the previous day had
+practice and restarts it otherwise; the streak shows as 0 after a full day
+without practice. Older progress without a log starts a fresh streak. The legacy
+weekday `activity` array is still written for compatibility but no longer drives
+the chart. Marking a word known is not counted as activity.
 
 ## Grammar completion
 
@@ -77,9 +116,16 @@ a combined topic. The Partizip II topic focuses on formation alongside the
 existing Perfekt topic. Existing conjugation and weil/dass rules keep their
 progress IDs rather than creating duplicate rules.
 
-Broad topics have 80 exercises for repeated practice across forms and contexts;
-narrower topics keep 20–40 exercises. Each topic’s
-window equals its exercise count. The passing target is `ceil(count × 7 / 8)`:
+Broad topics have 80 exercises per round for repeated practice across forms and
+contexts; narrower topics keep 20–40 exercises. Each topic’s window equals its
+round size.
+
+The first round keeps the curated order. Later rounds draw a deterministic,
+shuffled selection of the same size from the curated exercises plus an extra
+bank (`public/grammar-extra.js`, 852 exercises with more people, nouns, verbs,
+questions and sentence patterns). The selection depends only on the topic and
+round number, so reloading resumes the same exercise. Window sizes, passing
+targets and saved histories are unchanged. The passing target is `ceil(count × 7 / 8)`:
 
 | Exercises | Correct to pass |
 | --- | --- |
@@ -246,12 +292,13 @@ and [CPU limits](https://developers.cloudflare.com/workers/platform/limits/#cpu-
 - `public/app.js`: curriculum, exercises and client progress handling.
 - `public/vocabulary.js`: shared vocabulary catalog with permanent word IDs and parts of speech.
 - `public/levels.js`: XP rewards, rank thresholds and legacy XP conversion.
-- `public/grammar.js`: 1,500 grammar exercises across 24 topics.
+- `public/grammar.js`: 1,500 first-round grammar exercises across 24 topics.
+- `public/grammar-extra.js`: 852 further exercises mixed into later rounds.
 - `public/grammar-config.js`: topic sizes and passing targets shared by client and server.
 - `public/grammar-more.js`: local adverbs, separable/reflexive verbs, participles and countability.
 - `public/grammar-topics.js`: additional foundational topic exercises and explanations.
 - `public/grammar-theory.js`: the complete theory catalog.
-- `public/grammar-progress.js`: rolling grammar scores, completion and migration.
+- `public/grammar-progress.js`: rolling grammar scores, completion, migration and round selection.
 - `public/styles.css`: interface styles.
 - `app/page.tsx` and `app/sign-in/page.tsx`: app shell and account form.
 - `app/api/progress/route.ts`: authenticated progress endpoint.

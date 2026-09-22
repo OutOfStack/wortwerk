@@ -142,8 +142,11 @@ const banks = {
       q(`${which} ${noun} meinst du? — Ich meine ___. (this one)`, acc, demonstratives),
     ];
   }),
-  prepositions: prepositionContexts.flatMap(([sentence, answer, hint]) => names.map(name =>
-    q(`${name} ${sentence} (${hint})`, answer, ['mit', 'ohne', 'für', 'durch', 'gegen', 'um', 'aus', 'bei', 'nach', 'zu', 'von', 'seit', 'bis', 'ab', 'am', 'im', 'vor', 'in'].filter(value => value !== answer).slice(0, 3)))),
+  prepositions: prepositionContexts.flatMap(([sentence, answer, hint], index) => names.map(name => {
+    // Rotate through the list so each context offers different distractors.
+    const others = ['mit', 'ohne', 'für', 'durch', 'gegen', 'um', 'aus', 'bei', 'nach', 'zu', 'von', 'seit', 'bis', 'ab', 'am', 'im', 'vor', 'in'].filter(value => value !== answer);
+    return q(`${name} ${sentence} (${hint})`, answer, [0, 1, 2].map(k => others[(index * 3 + k * 5) % others.length]));
+  })),
   local: localPlaces.flatMap(([prep, article, noun, datTail = '', accTail = '']) => {
     const dat = article === 'die' ? 'der' : 'dem';
     const acc = article === 'der' ? 'den' : article;
@@ -213,8 +216,8 @@ export const EXTRA_THEORY = {
     note: 'Ask wer? or was? to find the subject. An object is different: Der Mann sieht den Hund — der Mann is nominative, den Hund is accusative.',
   },
   demonstrative: {
-    explanation: 'Demonstratives point to a particular person or thing. Dieser can stand before a noun or replace it, like “this” or “this one”. These exercises practise its nominative, accusative and dative forms.',
-    headers: ['Case', 'Masculine', 'Feminine', 'Neuter'], rows: [['Nominative', 'dieser', 'diese', 'dieses'], ['Accusative', 'diesen', 'diese', 'dieses'], ['Dative', 'diesem', 'dieser', 'diesem']],
+    explanation: 'Demonstratives point to a particular person or thing. Dieser can stand before a noun or replace it, like “this” or “this one”. These exercises practise its nominative, accusative and dative forms. The question word welcher (“which”) takes the same endings.',
+    headers: ['Case', 'Masculine', 'Feminine', 'Neuter', 'Plural'], rows: [['Nominative', 'dieser', 'diese', 'dieses', 'diese'], ['Accusative', 'diesen', 'diese', 'dieses', 'diese'], ['Dative', 'diesem', 'dieser', 'diesem', 'diesen']],
     examples: [['Dieser Tisch ist neu.', 'This table is new.'], ['Ich sehe diesen Tisch.', 'I see this table.'], ['Welchen Tisch meinst du? Diesen.', 'Which table do you mean? This one.']],
     note: 'These endings resemble the definite article: der → dieser, den → diesen, dem → diesem. Dies- points to the item; the ending shows its grammatical role.',
   },

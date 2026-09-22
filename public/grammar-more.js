@@ -129,10 +129,10 @@ banks.separable.push(...separableVerbs.flatMap(([infinitive, prefix, ich, du, co
 }));
 banks.reflexive.push(
   ...[
-    ['ärger', 'über den Lärm'], ['beschäftig', 'mit Musik'], ['bedank', 'bei Anna'],
+    ['ärger', 'über den Lärm'], ['beschäftig', 'mit Musik'], ['bedank', 'bei der Lehrerin'],
     ['rasier', 'jeden Morgen'], ['dusch', 'nach dem Sport'], ['erhol', 'im Urlaub'],
   ].flatMap(([stem, context]) => reflexiveSubjects.map(([subject, ending, pronoun]) =>
-    q(`${subject} ${stem}${stem.endsWith('er') && ending === 'en' ? 'n' : ending} ___ ${context}. (reflexive)`, pronoun, ['mich', 'dich', 'sich', 'uns', 'euch']))),
+    q(`${subject} ${stem}${stem === 'ärger' && ending === 'en' ? 'n' : ending} ___ ${context}. (reflexive)`, pronoun, ['mich', 'dich', 'sich', 'uns', 'euch']))),
   q('Ich kaufe ___ ein Buch. (for myself)', 'mir', ['mich', 'dir', 'sich']),
   q('Du kaufst ___ ein Buch. (for yourself)', 'dir', ['dich', 'mir', 'sich']),
   q('Ich merke ___ die Adresse. (I memorize it)', 'mir', ['mich', 'dir', 'sich']),

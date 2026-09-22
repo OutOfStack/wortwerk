@@ -34,6 +34,9 @@ const currentGrammarProgress = grammarProgress.superRefine((entries, context) =>
   }
 });
 const consistent = (data: { correct: number; answered: number }) => data.correct <= data.answered;
+// Answers per local calendar day (YYYY-MM-DD); the client keeps the latest 60 days.
+const activityLog = z.record(z.string().regex(/^\d{4}-\d{2}-\d{2}$/), counter)
+  .refine(log => Object.keys(log).length <= 60);
 // xpVersion is a protocol marker rather than learner data, so it is checked separately.
 const progressFields = z.object({
   xp: counter, xpVersion: z.literal(XP_VERSION).optional(), answered: counter, correct: counter,
@@ -45,6 +48,7 @@ const progressFields = z.object({
   grammarVersion: z.union([z.literal(1), z.literal(2), z.literal(GRAMMAR_VERSION)]).optional(),
   grammarProgress: grammarProgress.optional(),
   streak: counter, sound: z.boolean(), activity: z.array(counter).length(7),
+  activityLog: activityLog.optional(),
 }).strict();
 // Old stored progress is upgraded on read and persisted with its next save.
 export const progressSchema = progressFields.refine(consistent).transform(upgradeProgress);

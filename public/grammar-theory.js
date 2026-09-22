@@ -27,9 +27,9 @@ const BASE_THEORY={
   note:'Among these articles, only the masculine forms change. Pronouns also change: ich → mich, du → dich, er → ihn. The prepositions für, ohne, durch, gegen and um take the accusative too.'
  },
  modal:{
-  explanation:'A modal verb adds meaning such as ability (können), necessity (müssen), or intention (wollen). Conjugate the modal verb for the subject. Put the other verb in its infinitive form at the end of the clause.',
-  headers:['Subject','können','müssen','wollen'],rows:[['ich','kann','muss','will'],['du','kannst','musst','willst'],['er / sie / es','kann','muss','will'],['wir','können','müssen','wollen'],['ihr','könnt','müsst','wollt'],['sie / Sie','können','müssen','wollen']],
-  examples:[['Ich kann Deutsch sprechen.','I can speak German.'],['Du musst heute arbeiten.','You have to work today.'],['Könnt ihr kommen?','Can you come? (informal plural)']],
+  explanation:'A modal verb adds meaning such as ability (können), necessity (müssen), intention (wollen), permission (dürfen), an instruction from someone else (sollen) or a polite wish (möchten). Conjugate the modal verb for the subject. Put the other verb in its infinitive form at the end of the clause.',
+  headers:['Subject','können','müssen','wollen','dürfen','sollen','möchten'],rows:[['ich','kann','muss','will','darf','soll','möchte'],['du','kannst','musst','willst','darfst','sollst','möchtest'],['er / sie / es','kann','muss','will','darf','soll','möchte'],['wir','können','müssen','wollen','dürfen','sollen','möchten'],['ihr','könnt','müsst','wollt','dürft','sollt','möchtet'],['sie / Sie','können','müssen','wollen','dürfen','sollen','möchten']],
+  examples:[['Ich kann Deutsch sprechen.','I can speak German.'],['Du musst heute arbeiten.','You have to work today.'],['Könnt ihr kommen?','Can you come? (informal plural)'],['Hier darf man nicht parken.','You are not allowed to park here.'],['Ich möchte einen Kaffee trinken.','I would like to drink a coffee.']],
   note:'Do not conjugate both verbs: ich kann sprechen, not ich kann spreche. Do not add zu after these modals. Nicht müssen means “not have to”; “must not” is nicht dürfen.'
  },
  wordorder:{

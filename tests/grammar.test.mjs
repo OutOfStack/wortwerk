@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { RULES } from '../public/grammar.js';
 import { THEORY } from '../public/grammar-theory.js';
-import { RULE_IDS, ruleTarget, recordGrammarAnswer, grammarStatus } from '../public/grammar-progress.js';
+import { RULE_IDS, ruleTarget, recordGrammarAnswer, grammarStatus, exerciseDeck } from '../public/grammar-progress.js';
 import { upgradeProgress } from '../public/levels.js';
 
 test('every grammar rule has its configured number of distinct exercises with one answer option', () => {
@@ -174,4 +174,40 @@ test('expanded topics retain short histories and earned passes while unpassed hi
   assert.equal(growing.attempts, 160);
   assert.equal(recordGrammarAnswer(growing, true, 'perfect').answers.filter(Boolean).length, 75);
   assert.equal(recordGrammarAnswer(upgraded.grammarProgress.present, false, 'present').passed, true);
+});
+
+test('extra exercise banks are valid, distinct from curated exercises and mixed into later rounds', () => {
+  const normalized = value => value.toLowerCase().trim().replace(/[.!?]/g, '').replace(/\s+/g, ' ');
+  for (const rule of RULES) {
+    assert.ok(rule.extra.length >= 12, rule.id);
+    const prompts = [...rule.qs, ...rule.extra].map(([prompt]) => prompt);
+    assert.equal(new Set(prompts).size, prompts.length, `${rule.id}: duplicate prompt`);
+    for (const [prompt, answer, distractors] of rule.extra) {
+      assert.ok(prompt && answer && distractors.length >= 1, prompt);
+      const options = [answer, ...distractors].map(normalized);
+      assert.equal(new Set(options).size, options.length, `Answer collision: ${prompt}`);
+    }
+    assert.equal(exerciseDeck(rule, 0), rule.qs, 'the first round keeps the curated order');
+    const size = ruleTarget(rule.id).size;
+    for (const cycle of [1, 2, 7]) {
+      const deck = exerciseDeck(rule, cycle);
+      assert.equal(deck.length, size, rule.id);
+      assert.equal(new Set(deck.map(([prompt]) => prompt)).size, size, `${rule.id}: repeated exercise in a round`);
+      assert.deepEqual(exerciseDeck(rule, cycle), deck, 'rounds are deterministic');
+    }
+    assert.ok([1, 2, 3].some(cycle => exerciseDeck(rule, cycle).some(exercise => rule.extra.includes(exercise))), rule.id);
+  }
+});
+
+test('conjugation and sentence fixes stay correct', () => {
+  const all = RULES.flatMap(rule => [...rule.qs, ...rule.extra]);
+  assert.ok(all.every(([prompt]) => !/rasiern|informiern|konzentriern/.test(prompt)));
+  const find = (id, prompt) => [...RULES.find(rule => rule.id === id).qs, ...RULES.find(rule => rule.id === id).extra].find(([text]) => text === prompt)?.[1];
+  assert.equal(find('reflexive', 'Wir rasieren ___ jeden Morgen. (reflexive)'), 'uns');
+  assert.equal(find('reflexive', 'Wir ärgern ___ über den Lärm. (reflexive)'), 'uns');
+  assert.equal(find('reflexive', 'Lena und ich kümmern ___ um die Katze. (reflexive)'), 'uns');
+  assert.equal(find('wordorder', 'Choose the correct statement: am Montag / Anna / trinkt / Tee'), 'Am Montag trinkt Anna Tee.');
+  assert.equal(find('modal', '___ ich hier rauchen? (dürfen)'), 'Darf');
+  assert.equal(find('perfect', 'Die Kinder ___ in den Park gelaufen. (Perfekt)') ?? find('perfect', 'Mein Bruder ___ in den Park gelaufen. (Perfekt)'), 'ist');
+  assert.equal(find('because', 'Ich komme später, weil ___. (ich / muss / noch arbeiten)'), 'ich noch arbeiten muss');
 });

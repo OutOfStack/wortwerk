@@ -19,7 +19,8 @@ test('expanded vocabulary retains legacy progress identities and has valid uniqu
   for (const { id, de } of legacy) assert.equal(WORDS.find(word => word.id === id)?.de, de);
   assert.equal(new Set(WORDS.map(word => word.id)).size, WORDS.length);
   assert.equal(new Set(WORDS.map(word => word.de)).size, WORDS.length);
-  assert.equal(WORDS.length, 1000);
+  assert.equal(WORDS.length, 1172);
+  assert.ok(WORDS.slice(1000).every((word, i) => word.id === 1000 + i), 'new words append new IDs');
   for (const word of WORDS) {
     assert.ok(Number.isInteger(word.id) && word.id >= 0);
     assert.ok(['A1', 'A2'].includes(word.level));
@@ -203,7 +204,7 @@ test('vocabulary feedback always shows the full German word and translation', as
     }
   }
 });
-function boot(fetch, guestProgress = { ...empty(), xp: 555 }) {
+function boot(fetch, guestProgress = { ...empty(), xp: 555 }, windowExtras = {}) {
   const elements = new Map();
   const element = () => ({ textContent: '', innerHTML: '', classList: { add() {}, remove() {}, toggle() {} }, style: { setProperty() {} }, setAttribute() {}, replaceChildren() {}, append() {} });
   const storage = new Map([['wortwerk-progress', JSON.stringify({ ...empty(), xp: 99999 })], ['wortwerk-guest-progress', JSON.stringify(guestProgress)]]);
@@ -212,7 +213,7 @@ function boot(fetch, guestProgress = { ...empty(), xp: 555 }) {
     ...levels, ...grammar, RULES, THEORY, VOCABULARY_VERSION,
     document: { querySelector: s => { if (!elements.has(s)) elements.set(s, element()); return elements.get(s); }, querySelectorAll: () => [], createElement: element },
     localStorage: { getItem: k => storage.get(k), setItem: (k, v) => storage.set(k, v) },
-    window: { addEventListener() {} }, location: { assign() {} },
+    window: { addEventListener() {}, ...windowExtras }, location: { assign() {} },
   });
   vm.runInContext(`const WORDS=${JSON.stringify(WORDS)};\n${source}`, context);
   return { evaluate: code => vm.runInContext(code, context), elements, storage };
@@ -397,4 +398,118 @@ test('shorter cycles carry their score and can pass on the first answer of a lat
   assert.match(app.elements.get('#content').innerHTML, /A1 · Passed/);
   assert.match(app.elements.get('#content').innerHTML, /28 \/ 32 correct/);
   assert.equal(app.evaluate('nextRule().id'), 'present');
+});
+
+test('vocabulary rounds add English-to-German recognition and noun gender practice', async () => {
+  const app = boot(async () => response({ user: null }));
+  await settle();
+  const cheese = WORDS.find(word => word.de === 'der Käse');
+  const reverse = app.evaluate(`wordForm(WORDS.find(word=>word.id===${cheese.id}),3)`);
+  assert.equal(reverse.kind, 'choice');
+  assert.equal(reverse.prompt, 'cheese');
+  assert.equal(reverse.opts.length, 4);
+  assert.equal(reverse.opts.filter(option => option === 'der Käse').length, 1);
+  for (const option of reverse.opts) assert.ok(WORDS.some(word => word.de === option && word.pos === 'noun'), option);
+  const gender = app.evaluate(`wordForm(WORDS.find(word=>word.id===${cheese.id}),5)`);
+  assert.deepEqual({ ...gender, opts: [...gender.opts] }, { label: 'Choose the article', prompt: '___ Käse', promptLang: 'de', hint: 'cheese', answer: 'der', kind: 'choice', opts: ['der', 'die', 'das'], optsLang: 'de' });
+  const verb = WORDS.find(word => word.de === 'kommen');
+  assert.equal(app.evaluate(`wordForm(WORDS.find(word=>word.id===${verb.id}),5).kind`), 'letters', 'only nouns get article practice');
+  assert.equal(app.evaluate(`wordForm(WORDS.find(word=>word.id===${verb.id}),7).kind`), 'type');
+});
+
+test('streaks follow calendar days and the log keeps the latest 60 days', async () => {
+  const app = boot(async () => response({ user: null }), empty());
+  await settle();
+  assert.equal(app.evaluate('currentStreak()'), 0, 'a stored streak without recent practice is not shown');
+  app.evaluate("state.streak=4;state.activityLog={[dayKey(daysAgo(1))]:3};recordActivity()");
+  assert.equal(app.evaluate('state.streak'), 5);
+  app.evaluate('recordActivity()');
+  assert.equal(app.evaluate('state.streak'), 5, 'further answers today do not extend the streak');
+  assert.equal(app.evaluate('answersOn(daysAgo(0))'), 2);
+  app.evaluate("state.activityLog={[dayKey(daysAgo(2))]:1};state.streak=9;recordActivity()");
+  assert.equal(app.evaluate('state.streak'), 1, 'a missed day restarts the streak');
+  app.evaluate('state.activityLog=Object.fromEntries([...Array(70).keys()].map(i=>[dayKey(daysAgo(i+1)),1]));recordActivity()');
+  assert.equal(app.evaluate('Object.keys(state.activityLog).length'), 60);
+  assert.equal(app.evaluate('answersOn(daysAgo(0))'), 1);
+  app.evaluate('renderProgress()');
+  assert.match(app.elements.get('#content').innerHTML, /Last 7 days/);
+});
+
+test('grammar feedback completes the sentence and typed grammar answers keep articles', async () => {
+  const app = boot(async () => response({ user: null }));
+  await settle();
+  const complete = (prompt, answer) => app.evaluate(`completedSentence(${JSON.stringify(prompt)},${JSON.stringify(answer)})`);
+  assert.match(complete('Ich ___ müde.', 'bin'), /Ich <mark>bin<\/mark> müde\./);
+  assert.match(complete('Das ist ___ Tasche. (your (several friends))', 'eure'), /Das ist <mark>eure<\/mark> Tasche\.<\/span>$/);
+  assert.match(complete('Use a subject pronoun for “Paul”: ___ ist hier.', 'er'), />\s*<mark>Er<\/mark> ist hier\./);
+  assert.equal(complete('Choose the plural of “das Buch”.', 'Bücher'), '');
+  app.evaluate("session={type:'grammar',current:{kind:'type',answer:'dem',prompt:'Ich helfe ___ Kind.'}}");
+  for (const value of ['dem', ' DEM ']) assert.equal(app.evaluate(`matchesAnswer(${JSON.stringify(value)})`), true, value);
+  for (const value of ['den', 'Kind', '']) assert.equal(app.evaluate(`matchesAnswer(${JSON.stringify(value)})`), false, value);
+  app.evaluate("session.current.answer='Bücher'");
+  assert.equal(app.evaluate("matchesAnswer('buecher')"), true);
+  app.evaluate("session.current.answer='heißt'");
+  assert.equal(app.evaluate("matchesAnswer('heisst')"), true);
+  assert.equal(app.evaluate("canType(['Ich ___ müde.','bin',['bist','ist']])"), true);
+  assert.equal(app.evaluate("canType(['Choose…','Heute trinkt Anna Tee.',['a','b']])"), false);
+  assert.equal(app.evaluate("canType(['Countable?','Zählbar',['Unzählbar']])"), false);
+});
+
+test('later grammar rounds draw a stable mix from the larger bank', async () => {
+  const app = boot(async () => response({ user: null }), { ...empty(), grammarProgress: { sein: { answers: Array(32).fill(true), attempts: 32, passed: true } } });
+  await settle();
+  app.evaluate("startRule('sein')");
+  assert.equal(app.evaluate('session.cycle'), 1);
+  assert.equal(app.evaluate('session.index'), 0);
+  const first = app.evaluate('JSON.stringify(session.items.map(q=>q[0]))');
+  assert.notEqual(first, JSON.stringify(RULES[0].qs.map(q => q[0])));
+  assert.match(app.elements.get('#content').innerHTML, /Round 2: mixed sentences/);
+  app.evaluate("startRule('sein')");
+  assert.equal(app.evaluate('JSON.stringify(session.items.map(q=>q[0]))'), first, 'a reload resumes the same round');
+  app.evaluate("answer('wrong')");
+  assert.equal(app.evaluate('session.missed.length'), 1);
+});
+
+test('word search ignores articles, case and umlaut spelling', async () => {
+  const app = boot(async () => response({ user: null }));
+  await settle();
+  for (const query of ['Käse', 'kaese', 'KASE', 'der käse', 'cheese']) {
+    assert.equal(app.evaluate(`WORDS.filter(w=>searchKey(w.de).includes(searchKey(${JSON.stringify(query)}))||w.en.split(' / ').some(en=>searchKey(en).includes(searchKey(${JSON.stringify(query)})))).some(w=>w.de==='der Käse')`), true, query);
+  }
+  app.evaluate("renderWords();renderWordResults('Kaese')");
+  assert.match(app.elements.get('#wordResults').innerHTML, /der Käse/);
+  app.evaluate("renderWordResults('zzzz')");
+  assert.match(app.elements.get('#wordResults').innerHTML, /No matching words/);
+});
+
+test('pronunciation uses a German browser voice, auto-plays answers and hides without speech support', async () => {
+  const silent = boot(async () => response({ user: null }));
+  await settle();
+  silent.evaluate("session={type:'words',current:{kind:'type',answer:'Käse',word:{de:'der Käse',en:'cheese'}}}");
+  assert.doesNotMatch(silent.evaluate('answerFeedback(true)'), /data-speak/);
+  assert.equal(silent.elements.get('#soundBtn').hidden, true);
+
+  const spoken = [];
+  class SpeechSynthesisUtterance { constructor(text) { this.text = text; } }
+  const speechSynthesis = {
+    getVoices: () => [{ lang: 'en-US', name: 'English' }, { lang: 'de-AT', name: 'Austrian' }, { lang: 'de-DE', name: 'Google Deutsch' }],
+    cancel() {}, speak: utterance => spoken.push(utterance), addEventListener() {},
+  };
+  const app = boot(async () => response({ user: null }), empty(), { speechSynthesis, SpeechSynthesisUtterance });
+  await settle();
+  assert.equal(app.elements.get('#soundBtn').hidden, false);
+  app.evaluate("state=structuredClone(defaultState);session={type:'words',pool:[WORDS[2]],items:[WORDS[2]],index:0,roundCorrect:0,current:{kind:'type',answer:WORDS[2].de,word:WORDS[2]}};answer('kaese')");
+  assert.equal(spoken.at(-1).text, 'der Käse', 'the full word with its article is read after answering');
+  assert.equal(spoken.at(-1).lang, 'de-DE');
+  assert.equal(spoken.at(-1).voice.name, 'Google Deutsch');
+  assert.match(app.elements.get('#feedback').innerHTML, /data-speak="der Käse"/);
+  app.evaluate("state.sound=false;session.locked=false;answer('kaese')");
+  assert.equal(spoken.length, 1, 'auto-play follows the sound setting');
+  app.elements.get('#soundBtn').onclick();
+  assert.equal(app.evaluate('state.sound'), true);
+  assert.equal(app.evaluate("grammarSpeech('Ich weiß, dass ___. (ich / bin / müde)','ich müde bin')"), 'Ich weiß, dass ich müde bin.');
+  assert.equal(app.evaluate("grammarSpeech('Use a subject pronoun for “Paul”: ___ ist hier.','er')"), 'Er ist hier.');
+  assert.equal(app.evaluate("grammarSpeech('Choose the correct statement: heute / ich / lerne / Deutsch','Heute lerne ich Deutsch.')"), 'Heute lerne ich Deutsch.');
+  assert.equal(app.evaluate("grammarSpeech('Choose the plural of “das Buch”.','Bücher')"), '', 'isolated forms are not read out of context');
+  assert.doesNotMatch(app.evaluate("promptBox('cheese','','')"), /data-speak/, 'English prompts never reveal the German answer');
 });
