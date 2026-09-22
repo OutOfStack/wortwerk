@@ -73,6 +73,14 @@ test('every topic requires a full window and rounds its 87.5% passing target up'
   }
 });
 
+test('sein exercises use varied subjects and situations instead of repeated templates', () => {
+  const exercises = RULES.find(rule => rule.id === 'sein').qs;
+  const subjects = exercises.map(([prompt]) => prompt.split(' ___ ')[0]);
+  const situations = exercises.map(([prompt]) => prompt.split(' ___ ')[1]);
+  assert.ok(new Set(subjects).size >= 20);
+  assert.equal(new Set(situations).size, exercises.length);
+});
+
 test('rolling windows replace the oldest answer and retain passed status at every topic size', () => {
   for (const id of RULE_IDS) {
     const { size, target } = ruleTarget(id);
