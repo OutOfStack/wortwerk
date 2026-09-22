@@ -6,9 +6,41 @@ import { MORE_RULES } from './grammar-more.js';
 // and contexts. Curated subsets below keep coverage without padding every topic to 80.
 const question = (prompt, answer, choices) => [prompt, answer, [...new Set(choices)].filter(value => value !== answer)];
 const subjects = ['Ich', 'Du', 'Er', 'Wir', 'Ihr', 'Die Kinder', 'Anna', 'Anna und Paul'];
-const sein = ['bin', 'bist', 'ist', 'sind', 'seid', 'sind', 'ist', 'sind'];
 const endings = ['e', 'st', 't', 'en', 't', 'en', 't', 'en'];
-const predicates = ['müde', 'heute hier', 'in Berlin', 'zu Hause', 'bereit', 'im Garten', 'hungrig', 'im Büro', 'pünktlich', 'sehr freundlich'];
+const seinScenarios = [
+  ['Ich ___ nach der langen Reise müde.', 'bin'],
+  ['Du ___ heute für das Abendessen verantwortlich.', 'bist'],
+  ['Der Supermarkt ___ bis acht Uhr geöffnet.', 'ist'],
+  ['Wir ___ mit dem Zug in Berlin.', 'sind'],
+  ['Ihr ___ als Nächste an der Reihe.', 'seid'],
+  ['Die Kinder ___ auf dem Spielplatz.', 'sind'],
+  ['Anna ___ Ärztin im Krankenhaus.', 'ist'],
+  ['Meine Eltern ___ seit Montag im Urlaub.', 'sind'],
+  ['Ich ___ neu in dieser Stadt.', 'bin'],
+  ['Du ___ ein guter Freund.', 'bist'],
+  ['Der Kaffee ___ noch sehr heiß.', 'ist'],
+  ['Wir ___ am Eingang des Museums.', 'sind'],
+  ['Ihr ___ zu früh für den Termin.', 'seid'],
+  ['Paul und Mia ___ Geschwister.', 'sind'],
+  ['Meine Jacke ___ im Auto.', 'ist'],
+  ['Die Geschäfte ___ am Sonntag geschlossen.', 'sind'],
+  ['Ich ___ 24 Jahre alt.', 'bin'],
+  ['Du ___ mit deiner Antwort richtig.', 'bist'],
+  ['Unser Hotel ___ direkt am Bahnhof.', 'ist'],
+  ['Wir ___ bereit für die Prüfung.', 'sind'],
+  ['Ihr ___ gute Gäste.', 'seid'],
+  ['Die Bücher ___ in meinem Rucksack.', 'sind'],
+  ['Heute ___ Annas Geburtstag.', 'ist'],
+  ['Die Nachbarn ___ sehr freundlich.', 'sind'],
+  ['Ich ___ froh über die Nachricht.', 'bin'],
+  ['Du ___ zu spät für den Bus.', 'bist'],
+  ['Das Wetter ___ heute wunderbar.', 'ist'],
+  ['Wir ___ Gäste auf einer Hochzeit.', 'sind'],
+  ['Ihr ___ am Wochenende in Köln.', 'seid'],
+  ['Meine Schlüssel ___ auf dem Küchentisch.', 'sind'],
+  ['Der nächste Termin ___ am Dienstag.', 'ist'],
+  ['Anna und Paul ___ Eltern von zwei Kindern.', 'sind'],
+];
 const regularVerbs = [
   ['lern', 'Deutsch'], ['wohn', 'in Berlin'], ['mach', 'eine Pause'], ['kauf', 'Brot'],
   ['spiel', 'Tennis'], ['koch', 'Suppe'], ['hör', 'Musik'], ['such', 'den Schlüssel'],
@@ -144,7 +176,7 @@ const comparisons = [
 ];
 
 const banks = {
-  sein: predicates.flatMap(predicate => subjects.map((subject, i) => question(`${subject} ___ ${predicate}.`, sein[i], ['bin', 'bist', 'ist', 'sind', 'seid']))),
+  sein: seinScenarios.map(([prompt, answer]) => question(prompt, answer, ['bin', 'bist', 'ist', 'sind', 'seid'])),
   present: regularVerbs.flatMap(([stem, rest]) => subjects.map((subject, i) => question(`${subject} ${stem}___ ${rest}.`, endings[i], ['e', 'st', 't', 'en']))),
   articles: WORDS.filter(word => word.pos === 'noun').slice(0, 80).map(word => {
     const [article, ...noun] = word.de.split(' ');

@@ -363,6 +363,15 @@ test('every grammar topic renders its exercise, theory and saved score', async (
   assert.equal((app.elements.get('#content').innerHTML.match(/<article class="rule">/g) || []).length, 24);
 });
 
+test('grammar feedback and Continue appear before the supporting rule and theory', async () => {
+  const app = boot(async () => response({ user: null }));
+  await settle();
+  app.evaluate("startRule('sein');answer(session.current.answer)");
+  const html = app.elements.get('#content').innerHTML;
+  assert.ok(html.indexOf('id="feedback"') < html.indexOf('class="mastery-note"'));
+  assert.ok(html.indexOf('id="next"') < html.indexOf('class="rule-theory"'));
+});
+
 test('shorter cycles carry their score and can pass on the first answer of a later cycle', async () => {
   const app = boot(async () => response({ user: null }));
   await settle();
