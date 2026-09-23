@@ -66,6 +66,34 @@ function speak(text){
  speech.speak(utterance);
 }
 function speakButton(text){return speech&&text?`<button type="button" class="speak" data-speak="${esc(text)}" aria-label="Listen: ${esc(text)}" title="Listen">🔊</button>`:''}
+// English translation on request: Chrome's on-device Translator API when present,
+// otherwise a Google Translate link. Nothing is translated until the learner asks.
+const translations=new Map();let translatorReady=null,translatorBroken=false;
+function googleTranslate(text){return `https://translate.google.com/?sl=de&tl=en&op=translate&text=${encodeURIComponent(text)}`}
+function translateButton(text){
+ if(!text)return '';
+ return window.Translator&&!translatorBroken?`<button type="button" class="translate" data-translate="${esc(text)}" aria-label="Show English translation" title="Show English translation">EN</button>`:`<a class="translate" href="${esc(googleTranslate(text))}" target="_blank" rel="noopener" aria-label="Translate to English in a new tab" title="Translate to English (opens Google Translate)">EN ↗</a>`;
+}
+// Some Chromium builds expose the API but never answer, so every step has a deadline.
+function withTimeout(promise,ms){return Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout')),ms))])}
+async function translate(text,onProgress){
+ if(translations.has(text))return translations.get(text);
+ translatorReady??=(async()=>{
+  const languages={sourceLanguage:'de',targetLanguage:'en'},availability=await withTimeout(window.Translator.availability(languages),5000);
+  if(availability==='unavailable')throw new Error('unavailable');
+  // A language pack download can take a while; it reports progress instead.
+  const created=window.Translator.create({...languages,monitor:m=>m.addEventListener('downloadprogress',event=>onProgress(event.loaded))});
+  return availability==='available'?withTimeout(created,10000):created;
+ })().catch(error=>{translatorReady=null;translatorBroken=true;throw error});
+ const english=await withTimeout((await translatorReady).translate(text),10000);
+ translations.set(text,english);return english;
+}
+async function showTranslation(button){
+ const text=button.dataset.translate,out=document.createElement('span');
+ out.className='translation';out.lang='en';out.textContent='Translating…';button.replaceWith(out);
+ try{out.textContent=await translate(text,loaded=>{out.textContent=`Downloading the translator… ${Math.round(loaded*100)}%`})}
+ catch{out.innerHTML=`Translation unavailable here. <a href="${esc(googleTranslate(text))}" target="_blank" rel="noopener">Open Google Translate ↗</a>`}
+}
 function autoSpeak(text){if(state.sound)speak(text)}
 function updateSoundButton(){
  const button=$('#soundBtn');
@@ -109,7 +137,30 @@ function rankOverview(){
  return `<section class="rank-card" aria-label="Practice rank"><span class="eyebrow">Practice rank · Level ${rank.level}</span><h2>${esc(rank.title)} <small class="rank-meaning">${esc(rankMeaning(rank.level))}</small></h2>${next}<details class="rank-ladder"><summary>All ranks &amp; XP requirements</summary><ol>${RANK_TITLES.map((title,index)=>`<li class="${index+1===rank.level?'current':index+1<rank.level?'earned':''}" ${index+1===rank.level?'aria-current="step"':''}><span>Level ${index+1} · ${esc(title)} <small lang="en">${esc(rankMeaning(index+1))}</small></span><strong>${xpForLevel(index+1).toLocaleString('en')} XP</strong></li>`).join('')}</ol><p class="meta">How XP and levels work: see <button class="link" data-view-link="help">Help</button>.</p></details></section>`;
 }
 function go(view){if(!ready)return;session=null;speech?.cancel();currentView=view;document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));$('.sidebar').classList.remove('open');({today:renderToday,words:renderWords,grammar:renderGrammar,progress:renderProgress,help:renderHelp}[view]||renderToday)();window.scrollTo?.(0,0)}
-function renderToday(){const accuracy=state.answered?Math.round(state.correct/state.answered*100):0;const today=answersOn(daysAgo(0)),streak=currentStreak();content.innerHTML=`<section class="page"><span class="eyebrow">Your German workshop</span><h1>Guten Tag.</h1><p class="intro">Build useful German through short, repeated practice. Pass each grammar topic by reaching its target score in your latest answers.</p><div class="stats"><div class="stat"><strong>${state.xp}</strong><small>total XP</small></div><div class="stat"><strong>${accuracy}%</strong><small>answer accuracy</small></div><div class="stat"><strong>${Object.keys(state.wordMastery).length}</strong><small>words practised</small></div></div><div class="section-head"><div><span class="eyebrow">Continue</span><h2>Today’s practice</h2></div><p>${today?`${today} answer${today===1?'':'s'} today · ${streak}-day streak`:streak?`Practise today to keep your ${streak}-day streak`:'Answer once today to start a streak'}</p></div><div class="lesson-grid"><button class="lesson-card" data-start="words"><span class="lesson-icon">Aa</span><span><h3>Mixed vocabulary</h3><p>Meaning, recall, spelling and articles · 8 words</p></span><span class="score">→</span></button><button class="lesson-card" data-rule="${nextRule().id}"><span class="lesson-icon">§</span><span><h3>${nextRule().title}</h3><p>${nextRule().desc}</p></span><span class="score">${percent(ruleStatus(nextRule().id).correct,ruleStatus(nextRule().id).size)}%</span></button></div><div class="mastery-note"><strong>New here?</strong> Scores, XP, levels and streaks are explained in <button class="link" data-view-link="help">Help</button>.</div></section>`;bindLessonButtons()}
+// Revisit familiar words, then introduce A1 words before moving on to A2.
+function guidedWords(){
+ const pending=pendingWords(WORDS);
+ const reviews=shuffle(pending.filter(wasPractised));
+ const fresh=shuffle(pending.filter(word=>!wasPractised(word))).sort((a,b)=>a.level.localeCompare(b.level));
+ return [...reviews.slice(0,4),...fresh,...reviews.slice(4)].slice(0,8);
+}
+function startGuidedRound(){
+ const items=guidedWords();
+ if(items.length)startWordRound(items,WORDS,{guided:true});
+ else startRule(nextRule().id);
+}
+function wasPractised(word){return wordCorrect(word)>0||Object.hasOwn(state.wordMastery,word.id)}
+function renderToday(){
+ const accuracy=state.answered?`${percent(state.correct,state.answered)}%`:'—';
+ const today=answersOn(daysAgo(0)),streak=currentStreak(),items=guidedWords(),rule=nextRule(),progress=ruleStatus(rule.id);
+ const reviews=items.filter(wasPractised).length,newWords=items.filter(word=>!wasPractised(word));
+ const plan=items.length?[reviews?`${reviews} to revisit`:'',newWords.length?`${newWords.length} new ${newWords.every(word=>word.level==='A1')?'A1 ':''}words`:'','a few minutes'].filter(Boolean).join(' · '):`Continue ${rule.title} · your place is saved`;
+ content.innerHTML=`<section class="page"><span class="eyebrow">Your German workshop</span><h1>Guten Tag.</h1><p class="intro">A little German, a little more confidence. Let’s take the next step.</p>
+ <section class="guided-practice" aria-labelledby="guidedTitle"><div><span class="eyebrow">Picked for you</span><h2 id="guidedTitle">${items.length?'Your next small win.':'Keep your German growing.'}</h2><p>${esc(plan)}</p></div><button class="primary" id="guidedStart">${items.length?'Start guided practice':'Continue grammar'} <span aria-hidden="true">→</span></button></section>
+ <div class="stats"><div class="stat"><strong>${state.xp}</strong><small>total XP</small></div><div class="stat"><strong>${accuracy}</strong><small>answer accuracy</small></div><div class="stat"><strong>${Object.keys(state.wordMastery).length}</strong><small>words practised</small></div></div><div class="section-head"><div><span class="eyebrow">Explore</span><h2>Choose your practice</h2></div><p>${today?`${today} answer${today===1?'':'s'} today · ${streak}-day streak`:streak?`Practise today to keep your ${streak}-day streak`:'Answer once today to start a streak'}</p></div><div class="lesson-grid"><button class="lesson-card" data-start="words"><span class="lesson-icon">Aa</span><span><h3>Mixed vocabulary</h3><p>Meaning, recall, spelling and articles · 8 words</p></span><span class="score">→</span></button><button class="lesson-card" data-rule="${rule.id}"><span class="lesson-icon">§</span><span><h3>${rule.title}</h3><p>${rule.desc}</p><p>${progress.passed?'Passed':progress.answered?`${progress.answered}/${progress.size} first-round answers`:'Ready to start'}</p></span><span class="score" aria-hidden="true">→</span></button></div><div class="mastery-note"><strong>New here?</strong> Scores, XP, levels and streaks are explained in <button class="link" data-view-link="help">Help</button>.</div></section>`;
+ $('#guidedStart').onclick=()=>items.length?startWordRound(items,WORDS,{guided:true}):startRule(rule.id);
+ bindLessonButtons();
+}
 function renderHelp(){
  const levelRows=[2,5,10,15,20,25,MAX_LEVEL].map(level=>`<tr><th scope="row">Level ${level} · ${esc(rankTitle(level))}</th><td>${xpForLevel(level).toLocaleString('en')} XP</td></tr>`).join('');
  const card=(title,body)=>`<section class="help-card"><h2>${title}</h2>${body}</section>`;
@@ -117,18 +168,27 @@ function renderHelp(){
 ${card('XP',`<table class="help-table"><tbody><tr><th scope="row">Choosing an option or building from letters</th><td>${XP_REWARDS.choice} XP</td></tr><tr><th scope="row">Typing the answer</th><td>${XP_REWARDS.typed} XP</td></tr><tr><th scope="row">Wrong answers and “I know this”</th><td>0 XP</td></tr></tbody></table><p>Every correct answer counts, including grammar topics you have already passed.</p>`)}
 ${card('Levels &amp; ranks',`<p>Level 2 takes 30 XP. Each further level takes 40% more XP than the previous step. Ranks climb through nine materials, from Holz (wood) to Diamant (diamond), three steps each.</p><table class="help-table"><tbody>${levelRows}</tbody></table><p>Level ${MAX_LEVEL} is the top level. XP keeps counting after that. Ranks measure practice, not your German level. The full ladder is on <button class="link" data-view-link="progress">Progress</button>.</p>`)}
 ${card('Vocabulary',`<p>Rounds have 8 words. A word leaves practice after ${WORD_TARGET} correct answers, which cycle through: choosing the English meaning, typing the German, building it from letters, choosing the German word and, for nouns, choosing the article.</p><p>“I know this” hides a word without XP. Bring it back from Progress or the word search.</p>`)}
-${card('Grammar',`<p>Each topic has a round of 20–80 exercises. Your score is the share of correct answers among your latest answers, as many as one round. Pass at 87.5%, rounded (88%, or 90% for 20-exercise topics), after at least one full round. A passed topic stays passed.</p><p>Later rounds shuffle in new sentences. Switch between <strong>Choose</strong> and <strong>Type</strong> during practice. With two gaps, “—” leaves a gap empty.</p>`)}
+${card('Grammar',`<p>Each topic has a round of 20–80 exercises. Accuracy counts only questions you have answered; first-round completion is shown separately. Pass by reaching the topic’s required number of correct answers across a full round. A passed topic stays passed.</p><p>Later rounds shuffle in new sentences. Switch between <strong>Choose</strong> and <strong>Type</strong> during practice. With two gaps, “—” leaves a gap empty.</p>`)}
+${card('Mistake retries',`<p>After a round, choose <strong>Practise mistakes again</strong> to retry only the items you missed. You can repeat this until you feel confident. Correct retries earn normal XP. Vocabulary retries count toward learning the word; grammar retries are extra practice and leave your topic assessment and saved place unchanged.</p>`)}
 ${card('Typing',`<p>Capitalization is flexible. You can type ä, ö, ü as ae, oe, ue and ß as ss. In vocabulary the article is optional; in grammar it counts.</p>`)}
 ${card('Keyboard',`<p><kbd>1</kbd>–<kbd>9</kbd> choose an answer · <kbd>Enter</kbd> continues. When building words, type letters and use <kbd>Backspace</kbd> to undo.</p>`)}
+${card('Translation',`<p>After a grammar answer, <b>EN</b> shows the sentence in English. Chrome translates on your device (the first use downloads a small language pack); other browsers open Google Translate in a new tab.</p>`)}
 ${card('Pronunciation',`<p>🔊 reads German aloud with your browser’s German voice. The button in the top bar turns automatic read-aloud after each answer on or off. Voice quality depends on your device.</p>`)}
 ${card('Streaks &amp; saving',`<p>Your streak counts consecutive days with at least one answer, by your device’s calendar. Missing a whole day restarts it.</p><p>Guest progress stays on this device. Sign in to keep it in your account and use it on other devices.</p>`)}
 </div></section>`;
 }
 function ruleStatus(id){return grammarStatus(state.grammarProgress?.[id],id)}
-// Scores are shown as percentages of the topic window; both sides use the same
-// rounding, so reaching the target always displays as reaching the pass mark.
 const percent=(part,size)=>Math.round(part/size*100);
-function ruleScore(progress){const left=progress.size-progress.answered;return `Score ${percent(progress.correct,progress.size)}% · pass at ${percent(progress.target,progress.size)}%${progress.passed?' · Passed':left>0?` · first round: ${left} left`:''}`}
+function ruleCompletion(progress){
+ const {answered,size,target,passed}=progress;
+ const completion=answered<size?`First round: ${answered}/${size} answered`:`Latest ${size} answers`;
+ return `${completion} · ${passed?'Passed':`Pass with ${target}/${size} correct in a full round`}`;
+}
+function ruleScore(progress){
+ const {answered,correct}=progress;
+ const accuracy=answered?`Recent accuracy: ${percent(correct,answered)}% · ${correct}/${answered} correct`:'No answers yet';
+ return `${accuracy}<span class="grammar-detail">${ruleCompletion(progress)}</span>`;
+}
 function nextRule(){return RULES.find(r=>!ruleStatus(r.id).passed)||RULES[0]}
 function renderWords(level='all'){const list=level==='all'?WORDS:WORDS.filter(w=>w.level===level);content.innerHTML=`<section class="page"><span class="eyebrow">Vocabulary</span><h1>Words in motion.</h1><p class="intro">Each word leaves practice after 8 correct answers. Already know one? Choose “I know this”.</p><div class="word-search"><label for="wordQuery">Find a word</label><input id="wordQuery" type="search" placeholder="German or English, e.g. Käse or cheese" autocomplete="off" spellcheck="false"><div id="wordResults" aria-live="polite"></div></div><div class="filters">${['all','A1','A2'].map(x=>`<button class="filter ${x===level?'active':''}" data-level="${x}">${x==='all'?'All levels':x}</button>`).join('')}</div><div class="section-head word-section"><div><h2>${list.length-pendingWords(list).length}/${list.length} words complete</h2><p>Learned through practice or marked known · Colours show gender: <span class="g-der">der</span> · <span class="g-die">die</span> · <span class="g-das">das</span></p></div><button class="primary" data-start="words" data-word-level="${level}">Start mixed practice</button></div><div class="lesson-grid">${Object.entries(groupBy(list,'topic')).map(([topic,arr])=>{const done=arr.length-pendingWords(arr).length;return `<button class="lesson-card" data-topic="${topic}"><span class="lesson-icon">${topic.slice(0,1)}</span><span><h3>${topic}</h3><p>${done}/${arr.length} complete · ${[...new Set(arr.map(x=>x.level))].join(' / ')}</p><span class="bar topic-bar" aria-hidden="true"><span style="width:${done/arr.length*100}%"></span></span></span><span class="score">→</span></button>`}).join('')}</div></section>`;document.querySelectorAll('[data-level]').forEach(b=>b.onclick=()=>renderWords(b.dataset.level));bindLessonButtons();document.querySelectorAll('[data-topic]').forEach(b=>b.onclick=()=>startWords(list.filter(w=>w.topic===b.dataset.topic)));$('#wordQuery').oninput=event=>renderWordResults(event.target.value)}
 // Searching ignores articles, case and umlaut spelling, like typed answers do.
@@ -147,7 +207,7 @@ function renderGrammar(level='all'){
  const list=level==='all'?RULES:RULES.filter(r=>r.level===level);
  content.innerHTML=`<section class="page"><span class="eyebrow">Grammar gym</span><h1>Repeat until it sticks.</h1><p class="intro">Choose a topic and practise at your own pace. Your place is saved after every answer.</p><div class="filters">${['all','A1','A2'].map(x=>`<button class="filter ${x===level?'active':''}" data-level="${x}">${x==='all'?'All rules':x}</button>`).join('')}</div><div class="rule-list">${list.map(r=>{
   const progress=ruleStatus(r.id);
-  return `<article class="rule"><div><span class="eyebrow">${r.level} · ${progress.passed?'Passed':progress.attempts?'In progress':'Not started'}</span><h3>${r.title}</h3><div class="meta">${r.desc}</div><p class="grammar-score">${ruleScore(progress)}</p><div class="bar"><span style="width:${progress.correct/progress.size*100}%"></span></div><p class="meta">Next: exercise ${progress.next+1} of ${progress.size}</p></div><button class="${progress.attempts?'secondary':'primary'}" data-rule="${r.id}">${progress.passed?'Practise again':progress.attempts?'Continue rule':'Start rule'}</button>${ruleTheory(r)}</article>`;
+  return `<article class="rule"><div><span class="eyebrow">${r.level} · ${progress.passed?'Passed':progress.attempts?'In progress':'Not started'}</span><h3>${r.title}</h3><div class="meta">${r.desc}</div><p class="grammar-score">${ruleScore(progress)}</p><div class="bar" aria-hidden="true"><span style="width:${progress.answered/progress.size*100}%"></span></div><p class="meta">Next: exercise ${progress.next+1} of ${progress.size}</p></div><button class="${progress.attempts?'secondary':'primary'}" data-rule="${r.id}">${progress.passed?'Practise again':progress.attempts?'Continue rule':'Start rule'}</button>${ruleTheory(r)}</article>`;
  }).join('')}</div></section>`;
  document.querySelectorAll('[data-level]').forEach(b=>b.onclick=()=>renderGrammar(b.dataset.level));bindLessonButtons();
 }
@@ -185,7 +245,11 @@ function markWordKnown(){
 function startWords(pool=WORDS){
  const items=shuffle(pendingWords(pool)).slice(0,8);
  if(!items.length){session=null;content.innerHTML=`<div class="practice-wrap"><section class="practice"><span class="eyebrow">Vocabulary complete</span><h1>All words complete.</h1><p class="intro">Every word in this selection has been answered correctly ${WORD_TARGET} times or marked known. These words will no longer appear in practice.</p><button class="primary" id="backToWords">Back to vocabulary</button></section></div>`;$('#backToWords').onclick=()=>go('words');return}
- session={type:'words',pool,items,index:0,roundCorrect:0,roundAnswered:0,skipped:0,missed:[]};renderWordQuestion();
+ startWordRound(items,pool);
+}
+function startWordRound(items,pool,options={}){
+ session={type:'words',pool,items,index:0,roundCorrect:0,roundAnswered:0,skipped:0,missed:[],missedItems:[],...options};
+ renderWordQuestion();
 }
 // Prefer related words, but never fill a gap with a different part of speech.
 function relatedWords(word){
@@ -230,7 +294,7 @@ function wordForm(word,correctCount){
 function practiceShell(inner,after=''){content.innerHTML=`<div class="practice-wrap"><section class="practice"><div class="practice-top"><button class="secondary" id="quit">Exit</button><div class="bar"><span style="width:${session.index/session.items.length*100}%"></span></div><strong>${session.index+1}/${session.items.length}</strong></div>${inner}<div id="feedback" class="feedback hidden" role="status"></div>${after}</section></div>`;$('#quit').onclick=()=>go(session.type==='words'?'words':'grammar')}
 function choiceButtons(opts,lang){return `<div class="choices">${opts.map((o,i)=>`<button class="choice" data-answer="${esc(o)}"${lang?` lang="${lang}"`:''}><span class="key" aria-hidden="true">${i+1}</span>${esc(o)}</button>`).join('')}</div>`}
 function promptBox(text,lang,spoken=''){return `<div class="prompt${text.length>34?' long':''}"${lang?` lang="${lang}"`:''}>${esc(text)}${speakButton(spoken)}</div>`}
-function renderWordQuestion(){if(session.index>=session.items.length)return finishSession();let w=session.items[session.index],q=wordForm(w,wordCorrect(w));session.current={...q,word:w};let body=`<div class="prompt-label">${q.label} · ${wordCorrect(w)}/${WORD_TARGET} correct</div>${promptBox(q.prompt,q.promptLang,q.promptLang==='de'?q.prompt.replace(/^___ /,''):'')}${q.hint?`<p class="prompt-hint">${esc(q.hint)}</p>`:''}`;if(q.kind==='choice')body+=choiceButtons(q.opts,q.optsLang);if(q.kind==='type')body+=`<form class="type-row" id="answerForm"><input id="typed" autocomplete="off" autocapitalize="off" spellcheck="false" lang="de" placeholder="Type in German…" aria-label="Your answer" aria-describedby="answerHint"><button class="primary">Check</button></form><p class="answer-hint" id="answerHint">Article optional · ae, oe, ue and ss accepted</p>`;if(q.kind==='letters')body+=`<div class="answer-slots" id="built" lang="de" aria-live="polite"></div><div class="letters">${q.opts.map((o,i)=>`<button class="letter" data-letter="${esc(o)}" data-i="${i}"${o===' '?' aria-label="space"':''}>${o===' '?'␣':esc(o)}</button>`).join('')}</div><div class="type-row letter-actions"><button class="primary" id="checkBuilt">Check</button><button class="secondary" id="undoLetter">Undo</button><button class="secondary" id="clearLetters">Clear</button></div>`;practiceShell(body,`<div class="word-actions"><button class="secondary" id="knowWord" title="Hide this word from practice · no XP">I know this</button></div>`);$('#knowWord').onclick=markWordKnown;if(q.kind==='choice')document.querySelectorAll('[data-answer]').forEach(b=>b.onclick=()=>answer(b.dataset.answer,b));if(q.kind==='type'){$('#answerForm').onsubmit=e=>{e.preventDefault();answer($('#typed').value)};$('#typed').focus?.()}if(q.kind==='letters')bindLetters(q)}
+function renderWordQuestion(){if(session.index>=session.items.length)return finishSession();let w=session.items[session.index],q=wordForm(w,wordCorrect(w));session.current={...q,word:w};let body=`<div class="prompt-label">${session.retry?'Mistake retry · ':session.guided?'Guided practice · ':''}${q.label} · ${wordCorrect(w)}/${WORD_TARGET} correct</div>${promptBox(q.prompt,q.promptLang,q.promptLang==='de'?q.prompt.replace(/^___ /,''):'')}${q.hint?`<p class="prompt-hint">${esc(q.hint)}</p>`:''}`;if(q.kind==='choice')body+=choiceButtons(q.opts,q.optsLang);if(q.kind==='type')body+=`<form class="type-row" id="answerForm"><input id="typed" autocomplete="off" autocapitalize="off" spellcheck="false" lang="de" placeholder="Type in German…" aria-label="Your answer" aria-describedby="answerHint"><button class="primary">Check</button></form><p class="answer-hint" id="answerHint">Article optional · ae, oe, ue and ss accepted</p>`;if(q.kind==='letters')body+=`<div class="answer-slots" id="built" lang="de" aria-live="polite"></div><div class="letters">${q.opts.map((o,i)=>`<button class="letter" data-letter="${esc(o)}" data-i="${i}"${o===' '?' aria-label="space"':''}>${o===' '?'␣':esc(o)}</button>`).join('')}</div><div class="type-row letter-actions"><button class="primary" id="checkBuilt">Check</button><button class="secondary" id="undoLetter">Undo</button><button class="secondary" id="clearLetters">Clear</button></div>`;practiceShell(body,`<div class="word-actions"><button class="secondary" id="knowWord" title="Hide this word from practice · no XP">I know this</button></div>`);$('#knowWord').onclick=markWordKnown;if(q.kind==='choice')document.querySelectorAll('[data-answer]').forEach(b=>b.onclick=()=>answer(b.dataset.answer,b));if(q.kind==='type'){$('#answerForm').onsubmit=e=>{e.preventDefault();answer($('#typed').value)};$('#typed').focus?.()}if(q.kind==='letters')bindLetters(q)}
 function bindLetters(q){
  const picked=[];
  const show=()=>{$('#built').textContent=picked.map(i=>q.opts[i]).join('')};
@@ -244,10 +308,14 @@ function bindLetters(q){
 function startRule(id){
  const rule=RULES.find(r=>r.id===id),progress=ruleStatus(id);
  const cycle=Math.floor(progress.attempts/progress.size);
- session={type:'grammar',rule,cycle,items:exerciseDeck(rule,cycle),index:progress.next,roundCorrect:0,answered:0,missed:[]};
+ session={type:'grammar',rule,cycle,items:exerciseDeck(rule,cycle),index:progress.next,roundCorrect:0,answered:0,missed:[],missedItems:[]};
  renderRuleQuestion();
 }
-function grammarScore(id){return ruleScore(ruleStatus(id))}
+function grammarScore(id){
+ const answered=session.answered||0;
+ const accuracy=answered?`${percent(session.roundCorrect,answered)}% · ${session.roundCorrect}/${answered} correct`:'No answers yet';
+ return `${session.retry?'Retry':'This visit'} accuracy: ${accuracy}<span class="grammar-detail">${session.retry?'Extra practice · your topic progress stays unchanged.':ruleCompletion(ruleStatus(id))}</span>`;
+}
 // Typing suits short answers; sentence-order and two-option questions stay multiple choice.
 function canType(q){return q[1].split(' ').length<=2&&q[2].length>=2}
 function grammarInput(){try{return localStorage.getItem('wortwerk-grammar-input')==='type'?'type':'choice'}catch{return 'choice'}}
@@ -258,16 +326,36 @@ function renderRuleQuestion(mode=grammarInput()){
  session.current={answer:q[1],prompt:q[0],kind:typed?'type':'choice'};
  const input=typed?`<form class="type-row" id="answerForm"><input id="typed" autocomplete="off" autocapitalize="off" spellcheck="false" lang="de" placeholder="Type the missing part…" aria-label="Your answer" aria-describedby="answerHint"><button class="primary">Check</button></form><p class="answer-hint" id="answerHint">ae, oe, ue and ss accepted</p>`:choiceButtons(shuffle([q[1],...q[2]]),'de');
  const toggle=`<div class="input-toggle" role="group" aria-label="Answer mode"><button class="filter ${mode==='type'?'':'active'}" data-input="choice" aria-pressed="${mode!=='type'}">Choose</button><button class="filter ${mode==='type'?'active':''}" data-input="type" aria-pressed="${mode==='type'}">Type</button>${mode==='type'&&!typed?'<span>This one is multiple choice.</span>':''}</div>`;
- practiceShell(`<div class="prompt-label">${esc(session.rule.title)}${session.cycle?` · Round ${session.cycle+1}`:''}</div><p class="grammar-score" id="grammarScore" role="status">${grammarScore(session.rule.id)}</p>${toggle}${promptBox(q[0],'de')}${q[0].split('___').length===3?'<p class="prompt-hint">Fill both gaps; — leaves a gap empty.</p>':''}${input}`,`<div class="mastery-note"><strong>Rule</strong> — ${esc(session.rule.tip)}</div>${ruleTheory(session.rule)}`);
+ practiceShell(`<div class="prompt-label">${session.retry?'Mistake retry · ':''}${esc(session.rule.title)}${session.cycle?` · Round ${session.cycle+1}`:''}</div><p class="grammar-score" id="grammarScore" role="status">${grammarScore(session.rule.id)}</p>${toggle}${promptBox(q[0],'de')}${q[0].split('___').length===3?'<p class="prompt-hint">Fill both gaps; — leaves a gap empty.</p>':''}${input}`,`<div class="mastery-note"><strong>Rule</strong> — ${esc(session.rule.tip)}</div>${ruleTheory(session.rule)}`);
  document.querySelectorAll('[data-answer]').forEach(b=>b.onclick=()=>answer(b.dataset.answer,b));
  document.querySelectorAll('[data-input]').forEach(b=>b.onclick=()=>setGrammarInput(b.dataset.input));
  if(typed){$('#answerForm').onsubmit=e=>{e.preventDefault();answer($('#typed').value)};$('#typed').focus?.()}
 }
 function reviewList(missed){return missed.length?`<details class="rule-theory review" open><summary>Review your mistakes (${missed.length})</summary><ul class="review-list">${missed.map(item=>`<li>${item}</li>`).join('')}</ul></details>`:''}
+function retryButton(){
+ const count=session.missedItems?.length||0;
+ return count?`<button class="primary" id="retryMistakes">Practise ${count} mistake${count===1?'':'s'} again</button>`:'';
+}
+function bindRetry(){
+ if(session.missedItems?.length){$('#retryMistakes').onclick=retryMistakes;$('#retryMistakes').focus?.()}
+ else $('#again').focus?.();
+}
+function retryMistakes(){
+ const previous=session,items=previous?.missedItems;
+ if(!items?.length)return;
+ speech?.cancel();
+ if(previous.type==='words')startWordRound([...items],previous.pool,{retry:true,guided:previous.guided});
+ else{
+  session={type:'grammar',rule:previous.rule,cycle:previous.cycle,items:[...items],index:0,roundCorrect:0,answered:0,missed:[],missedItems:[],retry:true};
+  renderRuleQuestion();
+ }
+}
 function finishGrammar(){
- const progress=ruleStatus(session.rule.id);
- content.innerHTML=`<div class="practice-wrap"><section class="practice"><span class="eyebrow">${esc(session.rule.title)}</span><h1>${session.justPassed?'Rule passed!':progress.passed?'Practice complete.':'Keep going.'}</h1><p class="intro">${progress.passed?`You reached ${percent(progress.target,progress.size)}% over a full round. This rule stays passed.`:`Round complete. Continue with your score carried over; new answers replace the oldest.`}</p><div class="stats"><div class="stat"><strong>${percent(progress.correct,progress.size)}%</strong><small>score · pass at ${percent(progress.target,progress.size)}%</small></div><div class="stat"><strong>+${session.roundXp||0}</strong><small>XP earned this visit</small></div></div>${reviewList(session.missed||[])}<div class="type-row"><button class="primary" id="again">${progress.passed?'Practise again':'Continue practice'}</button><button class="secondary" id="done">Back to grammar</button></div></section></div>`;
- $('#again').onclick=()=>startRule(session.rule.id);$('#done').onclick=()=>go('grammar');$('#again').focus?.();
+ const progress=ruleStatus(session.rule.id),answered=session.answered||0;
+ const title=session.retry?(session.missedItems.length?'Keep building.':'Mistakes revisited!'):session.justPassed?'Rule passed!':progress.passed?'Practice complete.':'Round complete.';
+ const intro=session.retry?`You answered ${session.roundCorrect} of ${answered} correctly on retry. Continue the topic from where you left off.`:progress.passed?'You earned a pass for this topic. It stays passed.':'Continue with your recent answers carried over; new answers replace the oldest.';
+ content.innerHTML=`<div class="practice-wrap"><section class="practice"><span class="eyebrow">${session.retry?'Mistake retry · ':''}${esc(session.rule.title)}</span><h1>${title}</h1><p class="intro">${intro}</p><div class="stats"><div class="stat"><strong>${answered?`${percent(session.roundCorrect,answered)}%`:'—'}</strong><small>${session.roundCorrect}/${answered} correct this ${session.retry?'retry':'visit'}</small></div><div class="stat"><strong>+${session.roundXp||0}</strong><small>XP earned this visit</small></div></div><p class="grammar-score">${session.retry?'<span class="grammar-detail">Topic assessment · unchanged by retries</span>':''}${ruleScore(progress)}</p><div class="session-actions">${retryButton()}<button class="${session.missedItems?.length?'secondary':'primary'}" id="again">${progress.passed?'Practise topic again':'Continue topic'}</button><button class="secondary" id="done">Back to grammar</button></div>${reviewList(session.missed||[])}</section></div>`;
+ $('#again').onclick=()=>startRule(session.rule.id);$('#done').onclick=()=>go('grammar');bindRetry();
 }
 function normalise(s){return s.normalize('NFC').toLowerCase().trim().replace(/[.!?]/g,'').replace(/\s+/g,' ')}
 function normaliseWord(s){return normalise(s).replace(/^(der|die|das)\s+/,'').replace(/ß/g,'ss')}
@@ -314,15 +402,63 @@ function answerFeedback(ok,value=''){
  const {answer:correct,prompt=''}=session.current,sentence=completedSentence(prompt,correct);
  const exact=ok&&session.current.kind==='type'&&value.trim()!==correct?`<br>Exact form: <strong lang="de">${esc(correct)}</strong>`:'';
  const spoken=grammarSpeech(prompt,correct);
- return (ok?'Well done.':'Correct answer: <strong lang="de">'+esc(correct)+'</strong>')+exact+(sentence?`<br>${sentence} ${speakButton(spoken)}`:spoken?` ${speakButton(spoken)}`:'')+(session.justPassed?`<br><strong>Rule passed with ${percent(ruleStatus(session.rule.id).correct,ruleStatus(session.rule.id).size)}%!</strong>`:'');
+ return (ok?'Well done.':'Correct answer: <strong lang="de">'+esc(correct)+'</strong>')+exact+(sentence?`<br>${sentence} ${speakButton(spoken)}${translateButton(spoken)}`:spoken?` ${speakButton(spoken)}${translateButton(spoken)}`:'')+(session.justPassed?`<br><strong>Rule passed with ${percent(ruleStatus(session.rule.id).correct,ruleStatus(session.rule.id).size)}%!</strong>`:'');
 }
-function answer(value,button){if(session.locked)return;session.locked=true;let ok=matchesAnswer(value);state.answered++;if(ok){const reward=session.current.kind==='type'?XP_REWARDS.typed:XP_REWARDS.choice;state.correct++;session.roundCorrect++;session.roundXp=(session.roundXp||0)+reward;state.xp+=reward};state.activity[new Date().getDay()?new Date().getDay()-1:6]++;recordActivity();if(session.type==='words'){$('#knowWord').disabled=true;session.roundAnswered=(session.roundAnswered||0)+1;let id=session.current.word.id;state.wordCorrectCounts??={};if(ok)state.wordCorrectCounts[id]=Math.min(WORD_TARGET,wordCorrect(session.current.word)+1);state.wordMastery[id]=Math.round(wordCorrect(session.current.word)/WORD_TARGET*100);if(!ok)session.missed?.push(`${germanWord(session.current.word.de)} ${speakButton(session.current.word.de)} — ${esc(session.current.word.en)}`)}else{const id=session.rule.id;const wasPassed=ruleStatus(id).passed;state.grammarProgress??={};state.grammarProgress[id]=recordGrammarAnswer(state.grammarProgress[id],ok,id);session.answered=(session.answered||0)+1;session.justPassed=!wasPassed&&ruleStatus(id).passed;$('#grammarScore').innerHTML=grammarScore(id);if(!ok)session.missed?.push((completedSentence(session.current.prompt||'',session.current.answer)&&`${completedSentence(session.current.prompt||'',session.current.answer)} ${speakButton(grammarSpeech(session.current.prompt||'',session.current.answer))}`)||`<span lang="de">${esc(session.current.prompt||'')}</span> → <strong lang="de">${esc(session.current.answer)}</strong>`)}if(button){button.classList.add(ok?'correct':'wrong');document.querySelectorAll('.choice').forEach(b=>{if(matchesAnswer(b.dataset.answer))b.classList.add('correct');b.disabled=true})}document.querySelectorAll('.letter,#checkBuilt,#undoLetter,#clearLetters,#answerForm button,#typed').forEach(b=>b.disabled=true);let f=$('#feedback');f.className='feedback '+(ok?'good':'bad');f.innerHTML=`<div><strong>${ok?'Richtig!':'Not quite'}</strong><br>${answerFeedback(ok,value)}</div><button class="primary" id="next" title="Enter">Continue</button>`;save();autoSpeak(session.type==='words'?session.current.word.de:grammarSpeech(session.current.prompt||'',session.current.answer));$('#next').onclick=()=>{session.index++;session.locked=false;if(session.type==='words')renderWordQuestion();else renderRuleQuestion()};$('#next').focus?.({preventScroll:true});f.scrollIntoView?.({block:'nearest',behavior:'smooth'})}
+function answer(value,button){
+ if(session.locked)return;
+ session.locked=true;
+ const ok=matchesAnswer(value);
+ state.answered++;
+ if(ok){
+  const reward=session.current.kind==='type'?XP_REWARDS.typed:XP_REWARDS.choice;
+  state.correct++;session.roundCorrect++;session.roundXp=(session.roundXp||0)+reward;state.xp+=reward;
+ }
+ state.activity[new Date().getDay()?new Date().getDay()-1:6]++;recordActivity();
+ if(session.type==='words'){
+  $('#knowWord').disabled=true;
+  session.roundAnswered=(session.roundAnswered||0)+1;
+  const word=session.current.word;
+  state.wordCorrectCounts??={};
+  if(ok)state.wordCorrectCounts[word.id]=Math.min(WORD_TARGET,wordCorrect(word)+1);
+  state.wordMastery[word.id]=Math.round(wordCorrect(word)/WORD_TARGET*100);
+  if(!ok){
+   session.missed?.push(`${germanWord(word.de)} ${speakButton(word.de)} — ${esc(word.en)}`);
+   session.missedItems?.push(word);
+  }
+ }else{
+  const id=session.rule.id;
+  // Extra retries do not consume exercises in the saved assessment deck.
+  if(!session.retry){
+   const wasPassed=ruleStatus(id).passed;
+   state.grammarProgress??={};
+   state.grammarProgress[id]=recordGrammarAnswer(state.grammarProgress[id],ok,id);
+   session.justPassed=!wasPassed&&ruleStatus(id).passed;
+  }
+  session.answered=(session.answered||0)+1;
+  $('#grammarScore').innerHTML=grammarScore(id);
+  if(!ok){
+   const {prompt='',answer:correct}=session.current,completed=completedSentence(prompt,correct),spoken=grammarSpeech(prompt,correct);
+   session.missed?.push(completed?`${completed} ${speakButton(spoken)}${translateButton(spoken)}`:`<span lang="de">${esc(prompt)}</span> → <strong lang="de">${esc(correct)}</strong>`);
+   session.missedItems?.push(session.items[session.index]);
+  }
+ }
+ if(button){
+  button.classList.add(ok?'correct':'wrong');
+  document.querySelectorAll('.choice').forEach(b=>{if(matchesAnswer(b.dataset.answer))b.classList.add('correct');b.disabled=true});
+ }
+ document.querySelectorAll('.letter,#checkBuilt,#undoLetter,#clearLetters,#answerForm button,#typed').forEach(b=>b.disabled=true);
+ const feedback=$('#feedback');feedback.className='feedback '+(ok?'good':'bad');
+ feedback.innerHTML=`<div><strong>${ok?'Richtig!':'Not quite'}</strong><br>${answerFeedback(ok,value)}</div><button class="primary" id="next" title="Enter">Continue</button>`;
+ save();autoSpeak(session.type==='words'?session.current.word.de:grammarSpeech(session.current.prompt||'',session.current.answer));
+ $('#next').onclick=()=>{session.index++;session.locked=false;if(session.type==='words')renderWordQuestion();else renderRuleQuestion()};
+ $('#next').focus?.({preventScroll:true});feedback.scrollIntoView?.({block:'nearest',behavior:'smooth'});
+}
 function finishSession(){
  if(session.type==='grammar')return finishGrammar();
  const attempted=session.roundAnswered??session.items.length;
  const pct=attempted?Math.round(session.roundCorrect/attempted*100):0;
- content.innerHTML=`<div class="practice-wrap"><section class="practice"><span class="eyebrow">Round complete</span><h1>${!attempted?'All set.':pct>=80?'Sehr gut!':'Keep building.'}</h1><p class="intro">${attempted?`You answered ${session.roundCorrect} of ${attempted} correctly.`:'No answers submitted.'}${session.skipped?` ${session.skipped} marked known without XP.`:''}</p><div class="stats"><div class="stat"><strong>${attempted?`${pct}%`:'—'}</strong><small>this round</small></div><div class="stat"><strong>+${session.roundXp||0}</strong><small>XP earned</small></div><div class="stat"><strong>${attempted}</strong><small>words reviewed</small></div></div>${reviewList(session.missed||[])}<div class="type-row"><button class="primary" id="again">Practise again</button><button class="secondary" id="done">Done</button></div></section></div>`;
- $('#again').onclick=()=>startWords(session.pool);$('#done').onclick=()=>go('words');$('#again').focus?.();
+ content.innerHTML=`<div class="practice-wrap"><section class="practice"><span class="eyebrow">${session.retry?'Mistake retry complete':'Round complete'}</span><h1>${!attempted?'All set.':session.retry&&pct===100?'Mistakes revisited!':pct>=80?'Sehr gut!':'Keep building.'}</h1><p class="intro">${attempted?`You answered ${session.roundCorrect} of ${attempted} correctly.`:'No answers submitted.'}${session.skipped?` ${session.skipped} marked known without XP.`:''}</p><div class="stats"><div class="stat"><strong>${attempted?`${pct}%`:'—'}</strong><small>this round</small></div><div class="stat"><strong>+${session.roundXp||0}</strong><small>XP earned</small></div><div class="stat"><strong>${attempted}</strong><small>words reviewed</small></div></div><div class="session-actions">${retryButton()}<button class="${session.missedItems?.length?'secondary':'primary'}" id="again">${session.guided?'Another guided round':'Practise again'}</button><button class="secondary" id="done">Done</button></div>${reviewList(session.missed||[])}</section></div>`;
+ $('#again').onclick=()=>session.guided?startGuidedRound():startWords(session.pool);$('#done').onclick=()=>go(session.guided?'today':'words');bindRetry();
 }
 // Keyboard shortcuts for practice: number keys answer, Enter continues, and
 // letter-building accepts typed letters with Backspace to undo.
@@ -374,7 +510,7 @@ async function signOut(){
 function registerLearningTool(){const context=document.modelContext;if(!context?.registerTool)return;Promise.resolve(context.registerTool({name:'start_german_practice',title:'Start German practice',description:'Open a vocabulary round or a specific A1–A2 grammar rule in Wortwerk.',inputSchema:{type:'object',properties:{kind:{type:'string',enum:['words','grammar']},ruleId:{type:'string'}},required:['kind'],additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:false},execute(input){if(!ready)throw new Error('Wait until your account and progress have loaded.');if(!input||!['words','grammar'].includes(input.kind))throw new Error('kind must be words or grammar');if(input.kind==='words'){startWords();return{started:'words',questions:8}}const rule=RULES.find(r=>r.id===input.ruleId);if(!rule)throw new Error('Provide a valid ruleId: '+RULES.map(r=>r.id).join(', '));startRule(rule.id);return{started:'grammar',ruleId:rule.id,title:rule.title,questions:rule.qs.length}}})).catch(()=>{});}
 document.querySelectorAll('.nav-item').forEach(b=>b.onclick=()=>go(b.dataset.view));$('#menuBtn').onclick=()=>$('.sidebar').classList.toggle('open');
 window.addEventListener('keydown',practiceKeys);
-window.addEventListener('click',event=>{const button=event.target?.closest?.('[data-speak]');if(button){event.preventDefault();speak(button.dataset.speak)}const link=event.target?.closest?.('[data-view-link]');if(link){event.preventDefault();go(link.dataset.viewLink)}});
+window.addEventListener('click',event=>{const button=event.target?.closest?.('[data-speak]');if(button){event.preventDefault();speak(button.dataset.speak)}const translation=event.target?.closest?.('[data-translate]');if(translation){event.preventDefault();showTranslation(translation)}const link=event.target?.closest?.('[data-view-link]');if(link){event.preventDefault();go(link.dataset.viewLink)}});
 $('#soundBtn').onclick=()=>{state.sound=!state.sound;save();if(state.sound)speak('Ton an')};
 if(speech){loadVoices();speech.addEventListener?.('voiceschanged',loadVoices)}
 window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue=''}});

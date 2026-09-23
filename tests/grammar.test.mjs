@@ -140,7 +140,7 @@ test('new topics cover direction, separation, reflexive cases, participles and c
   const answerFor = (id, prompt) => RULES.find(rule => rule.id === id).qs.find(([text]) => text === prompt)?.[1];
   assert.equal(answerFor('localadverbs', 'Ich bin im Haus. Komm zu mir ___. (in, toward the speaker)'), 'herein');
   assert.equal(answerFor('separable', 'Ich sage, dass ich um sieben Uhr ___. (aufstehen)'), 'aufstehe');
-  assert.equal(answerFor('separable', 'Du ___ abends fern. (fernsehen)'), 'siehst');
+  assert.equal(answerFor('separable', 'Du ___ abends ___. (fernsehen)'), 'siehst … fern');
   assert.equal(answerFor('reflexive', 'Wir erinnern ___ an den Termin. (reflexive)'), 'uns');
   assert.equal(answerFor('reflexive', 'Ich wasche ___ die Hände. (my own hands)'), 'mir');
   assert.equal(answerFor('participle', 'Choose the Partizip II of “anrufen”.'), 'angerufen');

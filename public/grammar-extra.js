@@ -445,14 +445,17 @@ const separableVerbs = [
   ['zuhören', 'zu', 'höre', 'hörst', 'hört', 'gut', 'listen carefully'],
   ['mitbringen', 'mit', 'bringe', 'bringst', 'bringt', 'einen Kuchen', 'bring a cake'],
 ];
-const separable = separableVerbs.flatMap(([infinitive, prefix, ich, du, er, context, meaning], i) => {
+const separable = separableVerbs.flatMap(([infinitive, prefix, ich, , er, context, meaning], i) => {
   const rest = infinitive.slice(prefix.length);
   const name = pick(['Lena', 'Tom', 'Mia', 'Ben'], i);
+  // Every option uses the same person, so only the word order and the split decide the answer.
+  const separated = (subject, form) =>
+    q(`${subject} ___ ${context} ___. (${infinitive})`, gaps(form, prefix), [gaps(`${prefix}${form}`), gaps('—', `${prefix}${form}`), gaps(form)]);
   return [
-    q(`Ich ___ ${context} ___. (${infinitive})`, gaps(ich, prefix), [gaps(`${prefix}${ich}`), gaps(du, prefix), gaps(ich)]),
-    q(`${name} ___ ${context} ${prefix}. (${infinitive})`, er, [ich, du, infinitive]),
-    q(`Ich möchte ${context} ___. (${meaning})`, infinitive, [`${ich} ${prefix}`, `${prefix}zu${rest}`, `${prefix}${du}`]),
-    q(`Ich glaube, dass ${name} ${context} ___. (${infinitive})`, `${prefix}${er}`, [`${er} ${prefix}`, infinitive, `${prefix}${du}`]),
+    separated('Ich', ich),
+    separated(name, er),
+    q(`Ich möchte ${context} ___. (${meaning})`, infinitive, [`${ich} ${prefix}`, `${prefix}${ich}`, `${prefix}zu${rest}`]),
+    q(`Ich glaube, dass ${name} ${context} ___. (${infinitive})`, `${prefix}${er}`, [`${er} ${prefix}`, `${prefix} ${er}`, infinitive]),
   ];
 });
 

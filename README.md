@@ -6,7 +6,7 @@ An early German A1–A2 practice app with English instructions.
 
 - German → English and English → German multiple-choice vocabulary exercises.
 - English → German typed recall, letter-building and noun-article (der/die/das) exercises.
-- 1,172 vocabulary entries across 28 topics and 24 grammar topics with 20–80 exercises per round,
+- 1,194 vocabulary entries across 28 topics and 24 grammar topics with 20–80 exercises per round,
   drawn from a bank of 2,352 grammar exercises.
 - Randomized multiple-choice answers use the same part of speech, preferring the same topic and level.
 - Per-word progress: eight correct answers retire a word from normal practice.
@@ -20,12 +20,14 @@ An early German A1–A2 practice app with English instructions.
 - Grammar answers by choosing or typing; feedback shows the completed sentence.
 - Keyboard shortcuts: 1–9 answer, Enter continues, typed letters and Backspace
   in letter-building. Letter tiles also have Undo and Clear.
-- End-of-round review of missed words and sentences.
+- Guided practice above the homepage stats revisits up to four practised words, then adds new A1 words before A2.
+- End-of-round review and targeted retry of missed words and sentences. Grammar retries earn XP without changing assessment history or the saved exercise position.
 - Word search (ignores articles, case and umlaut spelling) with per-word status.
 - Daily streak and a last-7-days chart based on local calendar days.
 - A responsive interface for phones and desktops; answer feedback stays in view.
 
 - Pronunciation through the browser's built-in speech synthesis (German voice).
+- English translation of grammar sentences on request, after answering.
 
 This is a prototype, not a complete A1/A2 curriculum.
 
@@ -44,6 +46,17 @@ The app prefers a de-DE voice whose name suggests higher quality (online,
 natural or Google voices), then any de-DE voice, then other German variants.
 Quality depends on the device. Speech controls are hidden when the browser has
 no speech synthesis or lists voices but none in German.
+
+## Translation
+
+After a grammar answer, a small **EN** button next to the completed sentence
+shows it in English. It appears only after answering, so the translation cannot
+hint at the answer. Chrome 138+ on desktop translates on the device with the
+built-in [Translator API](https://developer.chrome.com/docs/ai/translator-api)
+(the first use downloads a de→en language pack); results are cached for the
+session. Other browsers get an **EN ↗** link that opens Google Translate in a new
+tab, as does Chrome if the language pack cannot be downloaded. Nothing is sent
+anywhere until the learner asks.
 
 ## XP and practice ranks
 
@@ -64,7 +77,7 @@ The 27 ranks are nine materials — Holz, Stein, Kupfer, Bronze, Eisen, Silber,
 Gold, Platin, Diamant — with three steps each, shown with their English meaning
 on the Progress page.
 
-With the current content, learning every word (1,172 × 11 = 12,892 XP) plus one
+With the current content, learning every word (1,194 × 11 = 13,134 XP) plus one
 perfect grammar round of every topic (1,500 XP choosing, up to 2,804 XP typing)
 reaches Level 16 (Silber 1). Grammar topics can be repeated for further XP.
 
@@ -80,10 +93,10 @@ are preserved. Old open tabs must reload before saving under the new XP rules.
 
 ## Vocabulary coverage and known words
 
-The catalog contains 1,172 independently curated everyday entries, including noun
+The catalog contains 1,194 independently curated everyday entries, including noun
 articles, English meanings, topics and parts of speech. The original 295 IDs are
-unchanged, and IDs 1000–1171 were appended. Topics include education, technology,
-nature, colors, numbers, pronouns, prepositions, animals, feelings, question
+unchanged, and IDs 1000–1193 were appended. Topics include education, technology,
+nature, colors, numbers (cardinal and ordinal), pronouns, prepositions, animals, feelings, question
 words and services (post office and authorities). A1/A2 tags are learning guidance, not an official
 word-by-word exam classification or a corpus frequency ranking.
 
@@ -102,7 +115,7 @@ belong to the account and sync through D1.
 
 `vocabularyVersion: 1` prevents older open tabs from overwriting the new
 `knownWordIds` field. Existing progress loads with an empty exclusion list. The
-progress request limit is 64 KiB to accommodate all 1,172 word records, known IDs,
+progress request limit is 64 KiB to accommodate all 1,194 word records, known IDs,
 all grammar histories and the activity log together (about 40 KiB at most).
 
 Each word cycles through its eight correct answers as: German → English choice,
@@ -121,10 +134,16 @@ the chart. Marking a word known is not counted as activity.
 
 ## Grammar completion
 
-Scores are shown as percentages of each topic's window (for example “Score 47% ·
-pass at 88%”); both values use the same rounding, so reaching the target always
-shows as reaching the pass mark. Until the first round is complete, the score line
-also shows how many answers are left.
+Accuracy uses only questions already answered, so one correct answer shows 100%,
+not 3% of a 32-question round. First-round completion and the required number of
+correct answers are shown separately. Practice shows accuracy for the current
+visit; the topic overview shows recent accuracy across saved answers. Passing thresholds are unchanged.
+
+After a round, **Practise mistakes again** starts a round containing only missed
+items. Further retries narrow to the remaining mistakes. Vocabulary retries follow
+the normal per-word progression; grammar retries are extra practice and do not
+advance the saved topic position or change the assessment window. Both earn normal
+XP and count as activity. Retry lists last for the current session.
 
 Answer cues avoid revealing the answer. Separable-verb gaps use two slots, written
 as “komme … an”, with “—” for an empty slot, so the infinitive cue (ankommen)

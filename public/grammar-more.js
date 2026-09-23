@@ -88,14 +88,18 @@ const participleContexts = [
 // Two gaps, verb then prefix: the infinitive cue cannot give away the answer,
 // because the task is where each part goes. "—" leaves a gap empty.
 const gaps = (verb, end = '—') => `${verb} … ${end}`;
+// Main clause: the verb goes in the first gap and the prefix at the end. Every option
+// uses the same person, so only the word order and the split decide the answer.
+const separated = (subject, context, infinitive, prefix, form) =>
+  q(`${subject} ___ ${context} ___. (${infinitive})`, gaps(form, prefix), [gaps(`${prefix}${form}`), gaps('—', `${prefix}${form}`), gaps(form)]);
 
 const banks = {
   localadverbs: localAdverbs.map(([prompt, answer, choices]) => q(prompt, answer, choices)),
   separable: separableVerbs.flatMap(([infinitive, prefix, ich, du, context, meaning]) => [
-    q(`Ich ___ ${context} ___. (${infinitive})`, gaps(ich, prefix), [gaps(`${prefix}${ich}`), gaps(du, prefix), gaps(ich)]),
-    q(`Du ___ ${context} ${prefix}. (${infinitive})`, du, [ich, infinitive, `${ich}n`]),
-    q(`Ich muss ${context} ___. (${meaning})`, infinitive, [`${ich} ${prefix}`, `${prefix}zu${infinitive.slice(prefix.length)}`, `${prefix}${du}`]),
-    q(`Ich sage, dass ich ${context} ___. (${infinitive})`, `${prefix}${ich}`, [`${ich} ${prefix}`, infinitive, `${prefix}${du}`]),
+    separated('Ich', context, infinitive, prefix, ich),
+    separated('Du', context, infinitive, prefix, du),
+    q(`Ich muss ${context} ___. (${meaning})`, infinitive, [`${ich} ${prefix}`, `${prefix}${ich}`, `${prefix}zu${infinitive.slice(prefix.length)}`]),
+    q(`Ich sage, dass ich ${context} ___. (${infinitive})`, `${prefix}${ich}`, [`${ich} ${prefix}`, `${prefix} ${ich}`, infinitive]),
   ]),
   reflexive: [
     ...reflexiveVerbs.flatMap(([stem, context]) => reflexiveSubjects.map(([subject, ending, pronoun]) =>
@@ -122,13 +126,13 @@ const banks = {
 };
 
 // Append drills to preserve the existing first-cycle exercise order.
-banks.separable.push(...separableVerbs.flatMap(([infinitive, prefix, ich, du, context, meaning]) => {
+banks.separable.push(...separableVerbs.flatMap(([infinitive, prefix, , du, context, meaning]) => {
   const plural = infinitive.slice(prefix.length);
   return [
-    q(`Wir ___ ${context} ${prefix}. (${infinitive})`, plural, [ich, du, infinitive]),
-    q(`Wir ___ ${context} ___. (${infinitive})`, gaps(plural, prefix), [gaps(infinitive), gaps(ich, prefix), gaps(plural)]),
-    q(`Du willst ${context} ___. (${meaning})`, infinitive, [`${du} ${prefix}`, `${prefix}${ich}`, `${prefix}${du}`]),
-    q(`Ich weiß, dass du ${context} ___. (${infinitive})`, `${prefix}${du}`, [`${du} ${prefix}`, infinitive, `${prefix}${ich}`]),
+    separated('Paul', context, infinitive, prefix, du.replace(/st$/, 't')),
+    separated('Wir', context, infinitive, prefix, plural),
+    q(`Du willst ${context} ___. (${meaning})`, infinitive, [`${du} ${prefix}`, `${prefix}${du}`, `${prefix}zu${plural}`]),
+    q(`Ich weiß, dass du ${context} ___. (${infinitive})`, `${prefix}${du}`, [`${du} ${prefix}`, `${prefix} ${du}`, infinitive]),
   ];
 }));
 banks.reflexive.push(

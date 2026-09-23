@@ -19,7 +19,7 @@ test('expanded vocabulary retains legacy progress identities and has valid uniqu
   for (const { id, de } of legacy) assert.equal(WORDS.find(word => word.id === id)?.de, de);
   assert.equal(new Set(WORDS.map(word => word.id)).size, WORDS.length);
   assert.equal(new Set(WORDS.map(word => word.de)).size, WORDS.length);
-  assert.equal(WORDS.length, 1172);
+  assert.equal(WORDS.length, 1194);
   assert.ok(WORDS.slice(1000).every((word, i) => word.id === 1000 + i), 'new words append new IDs');
   for (const word of WORDS) {
     assert.ok(Number.isInteger(word.id) && word.id >= 0);
@@ -354,7 +354,7 @@ test('grammar resumes immediately after the saved answer, including a reload bef
   await settle();
   reloaded.evaluate("startRule('sein')");
   assert.equal(reloaded.evaluate('session.index'), 1);
-  assert.match(reloaded.elements.get('#content').innerHTML, /Score 3% · pass at 88% · first round: 31 left/);
+  assert.match(reloaded.elements.get('#content').innerHTML, /This visit accuracy: No answers yet[\s\S]*First round: 1\/32 answered/);
   reloaded.evaluate("answer('wrong')");
   const accountProgress = JSON.parse(reloaded.storage.get('wortwerk-guest-progress'));
   const accountApp = boot(async path => response(path === '/api/auth/me' ? { user } : { userId: user.id, progress: accountProgress, revision: 4 }));
@@ -372,7 +372,8 @@ test('every grammar topic renders its exercise, theory and saved score', async (
     const html = app.elements.get('#content').innerHTML;
     assert.ok(html.includes(`1/${rule.qs.length}`), rule.id);
     assert.ok(html.includes('Theory &amp; examples'), rule.id);
-    assert.ok(html.includes(`Score 0% · pass at ${Math.round(Math.ceil(rule.qs.length * 7 / 8) / rule.qs.length * 100)}%`), rule.id);
+    assert.ok(html.includes(`Pass with ${Math.ceil(rule.qs.length * 7 / 8)}/${rule.qs.length} correct in a full round`), rule.id);
+    assert.ok(html.includes('No answers yet'), rule.id);
     assert.doesNotMatch(html, /answers recorded|Keys 1/, rule.id);
   }
   app.evaluate('renderGrammar()');
@@ -398,7 +399,7 @@ test('shorter cycles carry their score and can pass on the first answer of a lat
   }
   assert.equal(app.evaluate("ruleStatus('sein').passed"), false);
   assert.equal(app.evaluate("ruleStatus('sein').correct"), 27);
-  assert.match(app.elements.get('#content').innerHTML, /score carried over/);
+  assert.match(app.elements.get('#content').innerHTML, /recent answers carried over/);
   app.elements.get('#again').onclick();
   assert.equal(app.evaluate('session.index'), 0);
   assert.equal(app.evaluate("ruleStatus('sein').correct"), 27);
@@ -411,7 +412,7 @@ test('shorter cycles carry their score and can pass on the first answer of a lat
   assert.equal(app.elements.get('#totalMastery').textContent, '1 grammar rules passed');
   app.evaluate('renderGrammar()');
   assert.match(app.elements.get('#content').innerHTML, /A1 · Passed/);
-  assert.match(app.elements.get('#content').innerHTML, /Score 88% · pass at 88% · Passed/);
+  assert.match(app.elements.get('#content').innerHTML, /Recent accuracy: 88% · 28\/32 correct[\s\S]*Latest 32 answers · Passed/);
   assert.equal(app.evaluate('nextRule().id'), 'present');
 });
 
@@ -534,7 +535,10 @@ test('separable verbs use two gaps so the infinitive cue cannot reveal the prefi
   const all = [...separable.qs, ...separable.extra];
   assert.ok(all.every(([prompt, answer]) => !/\((\w+)\)$/.test(prompt) || !/^(auf|an|ein|aus|ab|mit|zu|vor|zurück|fern)$/.test(answer)), 'no single-prefix answers with a German infinitive cue');
   const found = all.find(([prompt]) => prompt === 'Ich ___ morgen ___. (ankommen)');
-  assert.deepEqual([found[1], [...found[2]].sort()], ['komme … an', ['ankomme … —', 'komme … —', 'kommst … an']]);
+  assert.deepEqual([found[1], [...found[2]].sort()], ['komme … an', ['ankomme … —', 'komme … —', '— … ankomme']]);
+  assert.ok(all.every(([prompt]) => !/___ .* (auf|an|ein|aus|ab|mit|zu|vor|zurück|fern)\. \(/.test(prompt)), 'the sentence never prints the prefix already');
+  const persons = ([, answer, options]) => new Set(options.map(option => option.split(' … ').find(part => part !== '—').replace(new RegExp(`^${answer.split(' … ')[1]}`), '')));
+  assert.ok(all.filter(([, answer]) => answer.includes(' … ')).every(item => persons(item).size === 1), 'main-clause options all share one verb form, so person agreement gives nothing away');
   const modal = RULES.find(rule => rule.id === 'modal');
   assert.ok([...modal.qs, ...modal.extra].every(([prompt]) => !/\((können|müssen|wollen|dürfen|sollen|möchten)\)/.test(prompt)), 'modal cues are English');
   const app = boot(async () => response({ user: null }));
@@ -544,4 +548,185 @@ test('separable verbs use two gaps so the infinitive cue cannot reveal the prefi
   assert.match(complete('Ich ___ morgen ___. (ankommen)', 'ankomme … —'), />Ich <mark>ankomme<\/mark> morgen\.</);
   assert.equal(app.evaluate("grammarSpeech('Wir ___ abends ___. (fernsehen)','sehen … fern')"), 'Wir sehen abends fern.');
   assert.equal(app.evaluate("canType(['Ich ___ morgen ___. (ankommen)','komme … an',['ankomme … —']])"), false);
+});
+
+test('grammar feedback offers an English translation on request', async () => {
+  const plain = boot(async () => response({ user: null }));
+  await settle();
+  assert.equal(plain.evaluate("translateButton('')"), '', 'isolated forms get no translation');
+  assert.match(plain.evaluate("translateButton('Du kommst heute mit.')"), /href="https:\/\/translate\.google\.com\/\?sl=de&amp;tl=en&amp;op=translate&amp;text=Du%20kommst%20heute%20mit\."/, 'browsers without a translator link to Google Translate');
+  plain.evaluate("session={type:'grammar',rule:RULES.find(r=>r.id==='separable'),current:{kind:'choice',prompt:'Du ___ heute ___. (mitkommen)',answer:'kommst … mit'}}");
+  assert.match(plain.evaluate('answerFeedback(true)'), /class="translate"/);
+
+  let created = 0, fail = false;
+  let availability = 'available';
+  const Translator = { availability: async () => availability, create: async ({ sourceLanguage, targetLanguage }) => {
+    created++;
+    if (fail) throw new Error('unavailable');
+    return { translate: async text => `[${sourceLanguage}→${targetLanguage}] ${text}` };
+  } };
+  const app = boot(async () => response({ user: null }), empty(), { Translator });
+  await settle();
+  const button = text => { const shown = {}; return { shown, dataset: { translate: text }, replaceWith: out => { shown.out = out; } }; };
+  assert.match(app.evaluate("translateButton('Ich bin hier.')"), /<button[^>]+data-translate="Ich bin hier\."[^>]*>EN<\/button>/);
+  const first = button('Ich bin hier.');
+  await app.evaluate('showTranslation')(first);
+  assert.equal(first.shown.out.textContent, '[de→en] Ich bin hier.');
+  const again = button('Ich bin hier.');
+  await app.evaluate('showTranslation')(again);
+  const other = button('Du bist da.');
+  await app.evaluate('showTranslation')(other);
+  assert.equal(created, 1, 'one translator is reused and results are cached');
+  assert.equal(other.shown.out.textContent, '[de→en] Du bist da.');
+
+  const broken = boot(async () => response({ user: null }), empty(), { Translator });
+  await settle();
+  fail = true;
+  const failed = button('Wir sind hier.');
+  await broken.evaluate('showTranslation')(failed);
+  assert.match(failed.shown.out.innerHTML, /Open Google Translate/, 'a failed download falls back to the link');
+  assert.match(broken.evaluate("translateButton('Wir sind hier.')"), /translate\.google\.com/, 'later sentences go straight to the link');
+
+  const unsupported = boot(async () => response({ user: null }), empty(), { Translator });
+  await settle();
+  availability = 'unavailable';
+  const before = created;
+  const skipped = button('Ihr seid hier.');
+  await unsupported.evaluate('showTranslation')(skipped);
+  assert.match(skipped.shown.out.innerHTML, /Open Google Translate/);
+  assert.equal(created, before, 'no download is attempted for an unsupported language pair');
+});
+
+test('guided practice starts above stats with new A1 words and the exact advertised selection', async () => {
+  const app = boot(async () => response({ user: null }), empty());
+  await settle();
+  const html = app.elements.get('#content').innerHTML;
+  assert.ok(html.indexOf('id="guidedStart"') < html.indexOf('class="stats"'));
+  assert.match(html, /8 new A1 words/);
+  assert.doesNotMatch(html, /0%<\/strong><small>answer accuracy/);
+  app.elements.get('#guidedStart').onclick();
+  assert.equal(app.evaluate('session.guided'), true);
+  assert.equal(app.evaluate('session.items.length'), 8);
+  assert.equal(app.evaluate("session.items.every(word=>word.level==='A1')"), true);
+  assert.equal(app.evaluate('new Set(session.items.map(word=>word.id)).size'), 8);
+});
+
+test('guided rounds balance revisits and new words, exclude complete words, and handle exhaustion', async () => {
+  const app = boot(async () => response({ user: null }), empty());
+  await settle();
+  app.evaluate('state.wordMastery=Object.fromEntries(WORDS.slice(0,6).map(word=>[word.id,0]));state.wordCorrectCounts={6:8};state.knownWordIds=["7"];startGuidedRound()');
+  assert.equal(app.evaluate('session.items.filter(wasPractised).length'), 4, 'even words answered incorrectly are revisited');
+  assert.equal(app.evaluate('session.items.some(word=>word.id===6||word.id===7)'), false);
+  assert.equal(app.evaluate("session.items.filter(word=>!wasPractised(word)).every(word=>word.level==='A1')"), true);
+  app.evaluate('state.knownWordIds=WORDS.slice(2).map(word=>String(word.id));startGuidedRound()');
+  assert.equal(app.evaluate('session.items.length'), 2, 'a small pool produces a short round');
+  app.evaluate('state.knownWordIds=WORDS.map(word=>String(word.id));renderToday()');
+  assert.match(app.elements.get('#content').innerHTML, /Continue grammar/);
+  app.elements.get('#guidedStart').onclick();
+  assert.equal(app.evaluate('session.type'), 'grammar', 'a finished vocabulary pool has a useful next action');
+});
+
+test('grammar distinguishes unanswered, accuracy, completion, and earned passes', async () => {
+  const app = boot(async () => response({ user: null }), empty());
+  await settle();
+  app.evaluate("startRule('sein')");
+  assert.match(app.elements.get('#content').innerHTML, /No answers yet/);
+  app.evaluate('answer(session.current.answer)');
+  const score = app.elements.get('#grammarScore').innerHTML;
+  assert.match(score, /This visit accuracy: 100% · 1\/1 correct/);
+  assert.match(app.evaluate("ruleScore(ruleStatus('sein'))"), /Recent accuracy: 100% · 1\/1 correct/);
+  assert.match(score, /First round: 1\/32 answered/);
+  assert.doesNotMatch(score, /Score 3%|Passed/);
+  app.elements.get('#next').onclick();
+  app.evaluate("answer('wrong')");
+  assert.match(app.elements.get('#grammarScore').innerHTML, /50% · 1\/2 correct/);
+  app.evaluate("state.grammarProgress.sein={answers:Array(32).fill(false),attempts:64,passed:true};renderGrammar()");
+  assert.match(app.elements.get('#content').innerHTML, /Recent accuracy: 0% · 0\/32 correct/);
+  assert.match(app.elements.get('#content').innerHTML, /Latest 32 answers · Passed/);
+});
+
+test('word retries contain only missed words and narrow to remaining mistakes', async () => {
+  const app = boot(async () => response({ user: null }), empty());
+  await settle();
+  app.evaluate('startWordRound(WORDS.slice(0,3),WORDS,{guided:true})');
+  for (let i=0;i<3;i++) {
+    app.evaluate(i<2?"answer('wrong')":'answer(session.current.answer)');
+    app.elements.get('#next').onclick();
+  }
+  assert.match(app.elements.get('#content').innerHTML, /Practise 2 mistakes again/);
+  app.elements.get('#retryMistakes').onclick();
+  assert.equal(JSON.stringify(app.evaluate('session.items.map(word=>word.id)')), '[0,1]');
+  assert.equal(app.evaluate('session.guided'), true);
+  app.evaluate('answer(session.current.answer);answer(session.current.answer)');
+  app.elements.get('#next').onclick();
+  app.evaluate("answer('wrong')");
+  app.elements.get('#next').onclick();
+  assert.match(app.elements.get('#content').innerHTML, /Practise 1 mistake again/);
+  app.elements.get('#retryMistakes').onclick();
+  assert.equal(JSON.stringify(app.evaluate('session.items.map(word=>word.id)')), '[1]');
+  app.evaluate('answer(session.current.answer)');
+  app.elements.get('#next').onclick();
+  assert.match(app.elements.get('#content').innerHTML, /Mistakes revisited!/);
+  assert.doesNotMatch(app.elements.get('#content').innerHTML, /id="retryMistakes"/);
+  const saved = JSON.parse(app.storage.get('wortwerk-guest-progress'));
+  assert.deepEqual(saved.wordCorrectCounts, {'0':1,'1':1,'2':1});
+  assert.equal(saved.xp, 3);
+  assert.equal(saved.answered, 6);
+  app.elements.get('#done').onclick();
+  assert.equal(app.evaluate('currentView'), 'today');
+});
+
+test('grammar retries preserve the assessment and saved position while awarding normal XP', async () => {
+  const app = boot(async () => response({ user: null }), empty());
+  await settle();
+  app.evaluate("startRule('sein')");
+  for (let i=0;i<32;i++) {
+    app.evaluate(i<5?"answer('wrong')":'answer(session.current.answer)');
+    app.elements.get('#next').onclick();
+  }
+  const before = JSON.stringify(app.evaluate('state.grammarProgress.sein'));
+  assert.match(app.elements.get('#content').innerHTML, /Practise 5 mistakes again/);
+  app.elements.get('#retryMistakes').onclick();
+  assert.equal(app.evaluate('session.items.length'), 5);
+  assert.equal(app.evaluate('session.items.every((q,i)=>q===RULES[0].qs[i])'), true);
+  for (let i=0;i<5;i++) {
+    app.evaluate(i===0?"answer('wrong')":'answer(session.current.answer)');
+    app.elements.get('#next').onclick();
+  }
+  assert.equal(JSON.stringify(app.evaluate('state.grammarProgress.sein')), before);
+  app.elements.get('#retryMistakes').onclick();
+  assert.equal(app.evaluate('session.items.length'), 1);
+  app.evaluate('answer(session.current.answer);answer(session.current.answer)');
+  app.elements.get('#next').onclick();
+  assert.match(app.elements.get('#content').innerHTML, /Mistakes revisited!/);
+  assert.doesNotMatch(app.elements.get('#content').innerHTML, /id="retryMistakes"|Rule passed!/);
+  const saved = JSON.parse(app.storage.get('wortwerk-guest-progress'));
+  assert.equal(JSON.stringify(saved.grammarProgress.sein), before);
+  assert.equal(saved.xp, 32);
+  assert.equal(saved.answered, 38);
+  app.elements.get('#again').onclick();
+  assert.equal(app.evaluate('session.cycle'), 1);
+  assert.equal(app.evaluate('session.index'), 0);
+  assert.equal(app.evaluate("ruleStatus('sein').passed"), false);
+  const reloaded = boot(async () => response({ user: null }), saved);
+  await settle();
+  reloaded.evaluate("startRule('sein')");
+  assert.equal(reloaded.evaluate('session.cycle'), 1);
+  assert.equal(reloaded.evaluate('session.index'), 0);
+});
+
+test('perfect rounds do not offer a mistake retry and known words stay excluded on retry', async () => {
+  const app = boot(async () => response({ user: null }), empty());
+  await settle();
+  app.evaluate('startWordRound([WORDS[0]],WORDS);answer(session.current.answer)');
+  app.elements.get('#next').onclick();
+  assert.doesNotMatch(app.elements.get('#content').innerHTML, /id="retryMistakes"/);
+  app.evaluate("startWordRound([WORDS[1]],WORDS);answer('wrong')");
+  app.elements.get('#next').onclick();
+  app.elements.get('#retryMistakes').onclick();
+  app.elements.get('#knowWord').onclick();
+  app.elements.get('#next').onclick();
+  assert.match(app.elements.get('#content').innerHTML, /1 marked known without XP/);
+  assert.doesNotMatch(app.elements.get('#content').innerHTML, /id="retryMistakes"|NaN|Infinity/);
+  assert.equal(app.evaluate('pendingWords([WORDS[1]]).length'), 0);
 });
