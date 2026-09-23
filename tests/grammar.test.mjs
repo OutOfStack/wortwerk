@@ -207,7 +207,7 @@ test('conjugation and sentence fixes stay correct', () => {
   assert.equal(find('reflexive', 'Wir ärgern ___ über den Lärm. (reflexive)'), 'uns');
   assert.equal(find('reflexive', 'Lena und ich kümmern ___ um die Katze. (reflexive)'), 'uns');
   assert.equal(find('wordorder', 'Choose the correct statement: am Montag / Anna / trinkt / Tee'), 'Am Montag trinkt Anna Tee.');
-  assert.equal(find('modal', '___ ich hier rauchen? (dürfen)'), 'Darf');
+  assert.equal(find('modal', '___ ich hier rauchen? (be allowed to)'), 'Darf');
   assert.equal(find('perfect', 'Die Kinder ___ in den Park gelaufen. (Perfekt)') ?? find('perfect', 'Mein Bruder ___ in den Park gelaufen. (Perfekt)'), 'ist');
   assert.equal(find('because', 'Ich komme später, weil ___. (ich / muss / noch arbeiten)'), 'ich noch arbeiten muss');
 });

@@ -18,6 +18,8 @@ const definite = ['der', 'die', 'das', 'den', 'dem'];
 const indefinite = ['ein', 'eine', 'einen', 'einem', 'einer'];
 const demonstratives = ['dieser', 'diese', 'dieses', 'diesen', 'diesem'];
 const pick = (list, index) => list[index % list.length];
+// Separable verbs: verb … prefix in two gaps; "—" leaves a gap empty.
+const gaps = (verb, end = '—') => `${verb} … ${end}`;
 
 const seinSubjects = [
   ['Mein Bruder', 2], ['Meine Eltern', 5], ['Frau Weber', 2], ['Lena und ich', 3], ['Du und Tom', 4],
@@ -48,14 +50,14 @@ const present = [
     const [subject, person] = pick(presentSubjects, index);
     return q(`${subject} ${stem}___ ${rest}.`, ENDINGS[person], ['e', 'st', 't', 'en']);
   })),
-  q('___ du gern Tennis? (spielen)', 'Spielst', ['Spiele', 'Spielt', 'Spielen']),
-  q('Wo ___ ihr? (wohnen)', 'wohnt', ['wohne', 'wohnst', 'wohnen']),
-  q('Was ___ Sie beruflich? (machen)', 'machen', ['mache', 'machst', 'macht']),
-  q('Wann ___ der Kurs? (beginnen)', 'beginnt', ['beginne', 'beginnst', 'beginnen']),
-  q('Wie ___ du? (heißen)', 'heißt', ['heiße', 'heißst', 'heißen']),
-  q('Was ___ wir heute? (kochen)', 'kochen', ['koche', 'kochst', 'kocht']),
-  q('___ ihr heute Abend? (kommen)', 'Kommt', ['Komme', 'Kommst', 'Kommen']),
-  q('Wie lange ___ du schon Deutsch? (lernen)', 'lernst', ['lerne', 'lernt', 'lernen']),
+  q('___ du gern Tennis? (to play)', 'Spielst', ['Spiele', 'Spielt', 'Spielen']),
+  q('Wo ___ ihr? (to live)', 'wohnt', ['wohne', 'wohnst', 'wohnen']),
+  q('Was ___ Sie beruflich? (to do)', 'machen', ['mache', 'machst', 'macht']),
+  q('Wann ___ der Kurs? (to begin)', 'beginnt', ['beginne', 'beginnst', 'beginnen']),
+  q('Wie ___ du? (to be called)', 'heißt', ['heiße', 'heißst', 'heißen']),
+  q('Was ___ wir heute? (to cook)', 'kochen', ['koche', 'kochst', 'kocht']),
+  q('___ ihr heute Abend? (to come)', 'Kommt', ['Komme', 'Kommst', 'Kommen']),
+  q('Wie lange ___ du schon Deutsch? (to learn)', 'lernst', ['lerne', 'lernt', 'lernen']),
 ];
 
 // Nouns beyond the first-cycle article drill, with the English meaning as a cue.
@@ -87,6 +89,8 @@ const MODALS = {
   sollen: ['soll', 'sollst', 'soll', 'sollen', 'sollt', 'sollen'],
   möchten: ['möchte', 'möchtest', 'möchte', 'möchten', 'möchtet', 'möchten'],
 };
+// English cues: the German infinitive would reveal the wir / sie form.
+export const MODAL_MEANINGS = { können: 'can', müssen: 'have to', wollen: 'want to', dürfen: 'be allowed to', sollen: 'be supposed to', möchten: 'would like to' };
 const modalContexts = [
   ['dürfen', 'hier nicht parken'], ['dürfen', 'heute länger aufbleiben'], ['dürfen', 'im Park Fußball spielen'],
   ['sollen', 'mehr Wasser trinken'], ['sollen', 'den Arzt anrufen'], ['sollen', 'um acht Uhr da sein'],
@@ -98,11 +102,11 @@ const modalSubjects = [['Ich', 0], ['Du', 1], ['Mein Vater', 2], ['Wir', 3], ['I
 const modal = [
   ...modalContexts.flatMap(([verb, context], i) => [0, 1, 2].map(k => {
     const [subject, person] = pick(modalSubjects, i * 3 + k);
-    return q(`${subject} ___ ${context}. (${verb})`, MODALS[verb][person], MODALS[verb]);
+    return q(`${subject} ___ ${context}. (${MODAL_MEANINGS[verb]})`, MODALS[verb][person], MODALS[verb]);
   })),
-  q('___ du morgen kommen? (können)', 'Kannst', MODALS.können), q('___ ich hier rauchen? (dürfen)', 'Darf', MODALS.dürfen),
-  q('Was ___ ihr trinken? (möchten)', 'möchtet', MODALS.möchten), q('Wann ___ wir da sein? (sollen)', 'sollen', MODALS.sollen),
-  q('___ Sie mir helfen? (können)', 'Können', MODALS.können), q('Wohin ___ du im Urlaub fahren? (wollen)', 'willst', MODALS.wollen),
+  q('___ du morgen kommen? (can)', 'Kannst', MODALS.können), q('___ ich hier rauchen? (be allowed to)', 'Darf', MODALS.dürfen),
+  q('Was ___ ihr trinken? (would like to)', 'möchtet', MODALS.möchten), q('Wann ___ wir da sein? (be supposed to)', 'sollen', MODALS.sollen),
+  q('___ Sie mir helfen? (can)', 'Können', MODALS.können), q('Wohin ___ du im Urlaub fahren? (want to)', 'willst', MODALS.wollen),
 ];
 
 const lowerFirst = value => value[0].toLowerCase() + value.slice(1);
@@ -441,13 +445,11 @@ const separableVerbs = [
   ['zuhören', 'zu', 'höre', 'hörst', 'hört', 'gut', 'listen carefully'],
   ['mitbringen', 'mit', 'bringe', 'bringst', 'bringt', 'einen Kuchen', 'bring a cake'],
 ];
-const prefixes = ['auf', 'an', 'ein', 'aus', 'ab', 'mit', 'zu', 'vor', 'zurück', 'fern'];
 const separable = separableVerbs.flatMap(([infinitive, prefix, ich, du, er, context, meaning], i) => {
   const rest = infinitive.slice(prefix.length);
-  const others = prefixes.filter(value => value !== prefix);
   const name = pick(['Lena', 'Tom', 'Mia', 'Ben'], i);
   return [
-    q(`Ich ${ich} ${context} ___. (${infinitive})`, prefix, [0, 1, 2].map(k => others[(i + k * 3) % others.length])),
+    q(`Ich ___ ${context} ___. (${infinitive})`, gaps(ich, prefix), [gaps(`${prefix}${ich}`), gaps(du, prefix), gaps(ich)]),
     q(`${name} ___ ${context} ${prefix}. (${infinitive})`, er, [ich, du, infinitive]),
     q(`Ich möchte ${context} ___. (${meaning})`, infinitive, [`${ich} ${prefix}`, `${prefix}zu${rest}`, `${prefix}${du}`]),
     q(`Ich glaube, dass ${name} ${context} ___. (${infinitive})`, `${prefix}${er}`, [`${er} ${prefix}`, infinitive, `${prefix}${du}`]),
@@ -498,7 +500,7 @@ const countable = [
   q('Ich kaufe ___ Tomaten. (several individual objects)', 'einige', ['etwas', 'viel', 'eine']),
   q('Ich möchte zwei ___ Wasser. (bottles)', 'Flaschen', ['Flasche', 'Wasser', 'Wassers']),
   q('Ich trinke eine ___ Tee. (cup)', 'Tasse', ['Tassen', 'Tee', 'Tees']),
-  q('Wir brauchen ein ___ Mehl. (kilo)', 'Kilo', ['Kilos', 'Mehl', 'Mehle']),
+  q('Wir brauchen ein ___ Mehl. (1,000 grams)', 'Kilo', ['Kilos', 'Mehl', 'Mehle']),
   q('Zwei ___ Brot, bitte. (slices)', 'Scheiben', ['Scheibe', 'Brote', 'Brots']),
   q('“Honig” as a substance. Is it countable here?', 'Unzählbar', ['Zählbar']),
   q('“die Banane” — one individual fruit. Is it countable here?', 'Zählbar', ['Unzählbar']),

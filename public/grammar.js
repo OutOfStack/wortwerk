@@ -1,7 +1,7 @@
 import { WORDS } from './vocabulary.js';
 import { EXTRA_RULES } from './grammar-topics.js';
 import { MORE_RULES } from './grammar-more.js';
-import { EXTRA_BANKS } from './grammar-extra.js';
+import { EXTRA_BANKS, MODAL_MEANINGS } from './grammar-extra.js';
 
 // Each tuple is [prompt, correct answer, distractors]. Templates vary subjects
 // and contexts. Curated subsets below keep coverage without padding every topic to 80.
@@ -184,7 +184,7 @@ const banks = {
     return question(`___ ${noun.join(' ')} (nominative: the)`, article, ['der', 'die', 'das', 'den']);
   }),
   accusative: accusativeQuestions(),
-  modal: modals.flatMap(modal => modal.contexts.flatMap(context => subjects.map((subject, i) => question(`${subject} ___ ${context}. (${modal.verb})`, modal.forms[i], modal.forms)))),
+  modal: modals.flatMap(modal => modal.contexts.flatMap(context => subjects.map((subject, i) => question(`${subject} ___ ${context}. (${MODAL_MEANINGS[modal.verb]})`, modal.forms[i], modal.forms)))),
   wordorder: clauses.flatMap(([subject, verb, rest]) => timePhrases.map(time => question(
     // Only the sentence-initial capital is dropped: am Montag, not am montag.
     `Choose the correct statement: ${time[0].toLowerCase()}${time.slice(1)} / ${subject} / ${verb} / ${rest}`,
@@ -220,7 +220,7 @@ export const RULES = [
   { id: 'present', level: 'A1', title: 'Verbkonjugation — present tense', desc: 'Regular verb endings; sein and modals have their own rules', tip: 'Remove -en and add: -e, -st, -t, -en, -t, -en.' },
   { id: 'articles', level: 'A1', title: 'Articles: der, die, das', desc: 'Gender and definite articles', tip: 'Choose the nominative article. Learn every noun together with its article.' },
   { id: 'accusative', level: 'A1', title: 'Accusative case', desc: 'Direct objects and einen', tip: 'Only masculine articles change: der → den, ein → einen. Use the / a hint to select the article type.' },
-  { id: 'modal', level: 'A1', title: 'Modal verbs', desc: 'können, müssen, wollen, dürfen, sollen, möchten', tip: 'Conjugate the modal verb in brackets; the other verb stays in the infinitive at the end.' },
+  { id: 'modal', level: 'A1', title: 'Modal verbs', desc: 'können, müssen, wollen, dürfen, sollen, möchten', tip: 'Conjugate the modal verb for the subject; the other verb stays in the infinitive at the end. The English cue names the modal.' },
   { id: 'wordorder', level: 'A1', title: 'Word order', desc: 'Verb in position 2', tip: 'In a statement, the conjugated verb stays in the second position.' },
   { id: 'perfect', level: 'A2', title: 'Perfect tense', desc: 'haben/sein + past participle', tip: 'Use sein for going, coming, travelling and staying; otherwise these exercises use haben.' },
   { id: 'dative', level: 'A2', title: 'Dative case', desc: 'Indirect objects, prepositions and locations', tip: 'Dative articles: dem / der / dem. Use dative after helfen, for recipients with geben, after mit / bei / zu / aus / von, and for static locations.' },

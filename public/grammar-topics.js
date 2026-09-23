@@ -59,7 +59,7 @@ const prepositionContexts = [
   ['bleibt ___ Freitag.', 'bis', 'until Friday'], ['arbeitet ___ Montag wieder.', 'ab', 'starting Monday'],
   ['kommt ___ acht Uhr.', 'um', 'at eight o’clock'], ['kommt ___ Montag.', 'am', 'on Monday'],
   ['kommt ___ Juli.', 'im', 'in July'], ['kommt ___ dem Essen.', 'nach', 'after the meal'],
-  ['wartet ___ dem Haus.', 'vor', 'in front of the house'], ['wohnt ___ Berlin.', 'in', 'in Berlin'],
+  ['wartet ___ dem Haus.', 'vor', 'in front of the house'], ['wohnt ___ Berlin.', 'in', 'location: inside a city'],
 ];
 
 // Static location versus a new destination with all nine Wechselpräpositionen.

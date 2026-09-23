@@ -14,7 +14,8 @@ An early German A1–A2 practice app with English instructions.
 - Vocabulary accepts optional articles, capitalization and alternative umlaut spellings.
 - Grammar completion at a topic-specific rolling target of at least 87.5%, with saved exercise positions.
 - Grammar theory, translated examples, tables and common mistakes.
-- XP-based numbered levels with 30 military-inspired ranks and further Marshal ranks.
+- XP-based levels (1 XP chosen, 2 XP typed) with 27 ranks named after materials, Holz 1 → Diamant 3, capped at 474,743 XP.
+- A Help page explaining scoring, XP, levels, shortcuts, pronunciation and streaks.
 - Email/password registration, sign-in, sign-out and account-specific progress in Cloudflare D1.
 - Grammar answers by choosing or typing; feedback shows the completed sentence.
 - Keyboard shortcuts: 1–9 answer, Enter continues, typed letters and Backspace
@@ -46,18 +47,30 @@ no speech synthesis or lists voices but none in German.
 
 ## XP and practice ranks
 
-Each correct vocabulary answer earns **1 XP** and each correct grammar answer
-earns **1 XP**. Incorrect answers earn no XP. A word still retires after eight
-correct recalls, so completing a new word earns up to 8 XP.
+A correct answer earns **1 XP** when it is chosen from options or built from
+given letters, and **2 XP** when it is typed (vocabulary recall or grammar in
+Type mode). Wrong answers and “I know this” earn nothing. A word retires after
+eight correct answers, three of which are typed, so a new word earns up to
+11 XP. `XP_VERSION` stays at 2: stored totals are not changed, and old open tabs
+simply keep awarding 1 XP until they reload.
 
 Level 1 starts at 0 XP. Reaching Level 2 takes 30 XP; each subsequent step costs
-50% more than the previous step, rounded to a whole XP: 30, 45, 68, 102, 153,
-230, and so on. Total thresholds begin at 0, 30, 75, 143, 245, and 398 XP.
-XP carries over on promotion, and the progress indicator restarts for the new
-level without resetting total XP. Requirements do not depend on the catalog size.
+40% more than the previous one, rounded to a whole XP: 30, 42, 59, 83, 116, and
+so on. Total thresholds begin at 0, 30, 72, 131, 214 and 330 XP. XP carries over
+on promotion. The ladder ends at **Level 27 (474,743 XP)**: after that, no next
+requirement is shown and total XP keeps counting.
 
-The Progress page lists all 30 ranks, from Cadet to Field Marshal, with total XP
-thresholds. Later levels continue as Field Marshal 2, Field Marshal 3, and so on.
+The 27 ranks are nine materials — Holz, Stein, Kupfer, Bronze, Eisen, Silber,
+Gold, Platin, Diamant — with three steps each, shown with their English meaning
+on the Progress page.
+
+With the current content, learning every word (1,172 × 11 = 12,892 XP) plus one
+perfect grammar round of every topic (1,500 XP choosing, up to 2,804 XP typing)
+reaches Level 16 (Silber 1). Grammar topics can be repeated for further XP.
+
+The Help page (sidebar → Help) explains XP, levels, scoring, typing rules,
+keyboard shortcuts, pronunciation, streaks and saving, so practice screens stay
+free of that text.
 Ranks measure practice, not CEFR proficiency; A1/A2 labels describe content only.
 
 Historical XP is converted once at 10:1, rounded down, and marked `xpVersion: 2`.
@@ -107,6 +120,16 @@ weekday `activity` array is still written for compatibility but no longer drives
 the chart. Marking a word known is not counted as activity.
 
 ## Grammar completion
+
+Scores are shown as percentages of each topic's window (for example “Score 47% ·
+pass at 88%”); both values use the same rounding, so reaching the target always
+shows as reaching the pass mark. Until the first round is complete, the score line
+also shows how many answers are left.
+
+Answer cues avoid revealing the answer. Separable-verb gaps use two slots, written
+as “komme … an”, with “—” for an empty slot, so the infinitive cue (ankommen)
+cannot give away the prefix. Modal verbs and present-tense questions use English
+cues because the German infinitive equals the wir / sie form.
 
 Topics include verb conjugation, causal clauses, plural forms, indefinite articles,
 personal and possessive pronouns, nominative, demonstratives, prepositions, local

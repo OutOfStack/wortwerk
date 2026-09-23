@@ -85,10 +85,14 @@ const participleContexts = [
   'habe Medizin', 'habe mit Paul', 'habe das Fahrrad', 'habe den Garten',
 ];
 
+// Two gaps, verb then prefix: the infinitive cue cannot give away the answer,
+// because the task is where each part goes. "—" leaves a gap empty.
+const gaps = (verb, end = '—') => `${verb} … ${end}`;
+
 const banks = {
   localadverbs: localAdverbs.map(([prompt, answer, choices]) => q(prompt, answer, choices)),
   separable: separableVerbs.flatMap(([infinitive, prefix, ich, du, context, meaning]) => [
-    q(`Ich ${ich} ${context} ___. (${infinitive})`, prefix, ['auf', 'an', 'ein', 'aus', 'ab', 'mit', 'zu', 'fern'].filter(value => value !== prefix).slice(0, 3)),
+    q(`Ich ___ ${context} ___. (${infinitive})`, gaps(ich, prefix), [gaps(`${prefix}${ich}`), gaps(du, prefix), gaps(ich)]),
     q(`Du ___ ${context} ${prefix}. (${infinitive})`, du, [ich, infinitive, `${ich}n`]),
     q(`Ich muss ${context} ___. (${meaning})`, infinitive, [`${ich} ${prefix}`, `${prefix}zu${infinitive.slice(prefix.length)}`, `${prefix}${du}`]),
     q(`Ich sage, dass ich ${context} ___. (${infinitive})`, `${prefix}${ich}`, [`${ich} ${prefix}`, infinitive, `${prefix}${du}`]),
@@ -122,7 +126,7 @@ banks.separable.push(...separableVerbs.flatMap(([infinitive, prefix, ich, du, co
   const plural = infinitive.slice(prefix.length);
   return [
     q(`Wir ___ ${context} ${prefix}. (${infinitive})`, plural, [ich, du, infinitive]),
-    q(`Wir ${plural} ${context} ___. (${infinitive})`, prefix, ['auf', 'an', 'ein', 'aus', 'ab', 'mit', 'zu', 'fern'].filter(value => value !== prefix).slice(0, 3)),
+    q(`Wir ___ ${context} ___. (${infinitive})`, gaps(plural, prefix), [gaps(infinitive), gaps(ich, prefix), gaps(plural)]),
     q(`Du willst ${context} ___. (${meaning})`, infinitive, [`${du} ${prefix}`, `${prefix}${ich}`, `${prefix}${du}`]),
     q(`Ich weiß, dass du ${context} ___. (${infinitive})`, `${prefix}${du}`, [`${du} ${prefix}`, infinitive, `${prefix}${ich}`]),
   ];

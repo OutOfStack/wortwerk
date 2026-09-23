@@ -274,22 +274,28 @@ test('an account-switch conflict preserves unsaved work and stops further writes
   assert.equal(posts, 1);
 });
 
-test('correct words earn 1 XP, correct grammar earns 1, and mistakes or double submissions earn nothing', async () => {
+test('typed answers earn 2 XP, chosen answers 1, and mistakes or double submissions earn nothing', async () => {
   const app = boot(async () => response({ user: null }));
   await settle();
   app.evaluate("state=structuredClone(defaultState);session={type:'words',pool:[WORDS[2]],items:[WORDS[2]],index:0,roundCorrect:0,current:{kind:'type',answer:WORDS[2].de,word:WORDS[2]}}");
   app.evaluate("answer('kaese');answer('kaese')");
-  assert.equal(app.evaluate('state.xp'), 1);
+  assert.equal(app.evaluate('state.xp'), 2, 'typed vocabulary');
   app.evaluate('finishSession()');
-  assert.match(app.elements.get('#content').innerHTML, /<strong>\+1<\/strong><small>XP earned/);
+  assert.match(app.elements.get('#content').innerHTML, /<strong>\+2<\/strong><small>XP earned/);
   app.evaluate("session.locked=false;answer('Brot')");
-  assert.equal(app.evaluate('state.xp'), 1);
-  app.evaluate("session={type:'grammar',rule:RULES[0],items:RULES[0].qs,index:0,roundCorrect:0,current:{answer:'bin'}};answer('bin');answer('bin')");
   assert.equal(app.evaluate('state.xp'), 2);
+  app.evaluate("session={type:'words',pool:[WORDS[2]],items:[WORDS[2]],index:0,roundCorrect:0,current:{kind:'letters',answer:'Käse',word:WORDS[2]}};answer('Käse')");
+  assert.equal(app.evaluate('state.xp'), 3, 'letter building counts as choosing');
+  app.evaluate("session={type:'words',pool:[WORDS[2]],items:[WORDS[2]],index:0,roundCorrect:0,current:{kind:'choice',answer:'cheese',word:WORDS[2]}};answer('cheese')");
+  assert.equal(app.evaluate('state.xp'), 4);
+  app.evaluate("session={type:'grammar',rule:RULES[0],items:RULES[0].qs,index:0,roundCorrect:0,current:{answer:'bin',kind:'choice'}};answer('bin');answer('bin')");
+  assert.equal(app.evaluate('state.xp'), 5, 'chosen grammar');
   app.evaluate("session.locked=false;answer('bist')");
-  assert.equal(app.evaluate('state.xp'), 2);
+  assert.equal(app.evaluate('state.xp'), 5);
+  app.evaluate("session.locked=false;session.current={answer:'bin',kind:'type',prompt:'Ich ___ müde.'};answer('BIN')");
+  assert.equal(app.evaluate('state.xp'), 7, 'typed grammar');
   app.evaluate('finishSession()');
-  assert.match(app.elements.get('#content').innerHTML, /<strong>\+1<\/strong><small>XP earned this visit/);
+  assert.match(app.elements.get('#content').innerHTML, /<strong>\+3<\/strong><small>XP earned this visit/);
   assert.equal(JSON.parse(app.storage.get('wortwerk-guest-progress')).xpVersion, 2);
 });
 
@@ -298,12 +304,20 @@ test('sidebar promotes at the threshold and shows remaining progress in the new 
   await settle();
   app.evaluate('state.xp=30;updateChrome()');
   assert.equal(app.elements.get('#levelNumber').textContent, 2);
-  assert.equal(app.elements.get('#rankName').textContent, 'Senior Cadet');
-  assert.equal(app.elements.get('#rankProgress').textContent, '0 / 45 XP · Level 2');
+  assert.equal(app.elements.get('#rankName').textContent, 'Holz 2');
+  assert.equal(app.elements.get('#rankProgress').textContent, '0 / 42 XP · Level 2');
   app.evaluate('state.xp=75;renderProgress()');
   assert.match(app.elements.get('#content').innerHTML, /Practice rank · Level 3/);
-  assert.match(app.elements.get('#content').innerHTML, /68 XP to/);
-  assert.match(app.elements.get('#content').innerHTML, /Level 30 · Field Marshal/);
+  assert.match(app.elements.get('#content').innerHTML, /56 XP to/);
+  assert.match(app.elements.get('#content').innerHTML, /Level 27 · Diamant 3 <small lang="en">diamond/);
+  assert.doesNotMatch(app.elements.get('#content').innerHTML, /military|Marshal|Cadet|Level 28/);
+  app.evaluate('state.xp=600000;updateChrome();renderProgress()');
+  assert.equal(app.elements.get('#rankProgress').textContent, '600,000 XP · Top level');
+  assert.match(app.elements.get('#content').innerHTML, /Top level reached/);
+  assert.doesNotMatch(app.elements.get('#content').innerHTML, /XP to <strong>|null|NaN/);
+  app.evaluate('renderHelp()');
+  const help = app.elements.get('#content').innerHTML;
+  for (const text of ['Typing the answer</th><td>2 XP', 'building from letters</th><td>1 XP', '474,743 XP', 'Level 27 is the top level']) assert.ok(help.includes(text), text);
 });
 
 test('old guest and account XP upgrades once while retaining learning progress', async () => {
@@ -340,7 +354,7 @@ test('grammar resumes immediately after the saved answer, including a reload bef
   await settle();
   reloaded.evaluate("startRule('sein')");
   assert.equal(reloaded.evaluate('session.index'), 1);
-  assert.match(reloaded.elements.get('#content').innerHTML, /1 \/ 32 correct/);
+  assert.match(reloaded.elements.get('#content').innerHTML, /Score 3% · pass at 88% · first round: 31 left/);
   reloaded.evaluate("answer('wrong')");
   const accountProgress = JSON.parse(reloaded.storage.get('wortwerk-guest-progress'));
   const accountApp = boot(async path => response(path === '/api/auth/me' ? { user } : { userId: user.id, progress: accountProgress, revision: 4 }));
@@ -358,7 +372,8 @@ test('every grammar topic renders its exercise, theory and saved score', async (
     const html = app.elements.get('#content').innerHTML;
     assert.ok(html.includes(`1/${rule.qs.length}`), rule.id);
     assert.ok(html.includes('Theory &amp; examples'), rule.id);
-    assert.ok(html.includes(`0 / ${rule.qs.length} correct`), rule.id);
+    assert.ok(html.includes(`Score 0% · pass at ${Math.round(Math.ceil(rule.qs.length * 7 / 8) / rule.qs.length * 100)}%`), rule.id);
+    assert.doesNotMatch(html, /answers recorded|Keys 1/, rule.id);
   }
   app.evaluate('renderGrammar()');
   assert.equal((app.elements.get('#content').innerHTML.match(/<article class="rule">/g) || []).length, 24);
@@ -396,7 +411,7 @@ test('shorter cycles carry their score and can pass on the first answer of a lat
   assert.equal(app.elements.get('#totalMastery').textContent, '1 grammar rules passed');
   app.evaluate('renderGrammar()');
   assert.match(app.elements.get('#content').innerHTML, /A1 · Passed/);
-  assert.match(app.elements.get('#content').innerHTML, /28 \/ 32 correct/);
+  assert.match(app.elements.get('#content').innerHTML, /Score 88% · pass at 88% · Passed/);
   assert.equal(app.evaluate('nextRule().id'), 'present');
 });
 
@@ -463,7 +478,7 @@ test('later grammar rounds draw a stable mix from the larger bank', async () => 
   assert.equal(app.evaluate('session.index'), 0);
   const first = app.evaluate('JSON.stringify(session.items.map(q=>q[0]))');
   assert.notEqual(first, JSON.stringify(RULES[0].qs.map(q => q[0])));
-  assert.match(app.elements.get('#content').innerHTML, /Round 2: mixed sentences/);
+  assert.match(app.elements.get('#content').innerHTML, /sein — to be · Round 2</);
   app.evaluate("startRule('sein')");
   assert.equal(app.evaluate('JSON.stringify(session.items.map(q=>q[0]))'), first, 'a reload resumes the same round');
   app.evaluate("answer('wrong')");
@@ -512,4 +527,21 @@ test('pronunciation uses a German browser voice, auto-plays answers and hides wi
   assert.equal(app.evaluate("grammarSpeech('Choose the correct statement: heute / ich / lerne / Deutsch','Heute lerne ich Deutsch.')"), 'Heute lerne ich Deutsch.');
   assert.equal(app.evaluate("grammarSpeech('Choose the plural of “das Buch”.','Bücher')"), '', 'isolated forms are not read out of context');
   assert.doesNotMatch(app.evaluate("promptBox('cheese','','')"), /data-speak/, 'English prompts never reveal the German answer');
+});
+
+test('separable verbs use two gaps so the infinitive cue cannot reveal the prefix', async () => {
+  const separable = RULES.find(rule => rule.id === 'separable');
+  const all = [...separable.qs, ...separable.extra];
+  assert.ok(all.every(([prompt, answer]) => !/\((\w+)\)$/.test(prompt) || !/^(auf|an|ein|aus|ab|mit|zu|vor|zurück|fern)$/.test(answer)), 'no single-prefix answers with a German infinitive cue');
+  const found = all.find(([prompt]) => prompt === 'Ich ___ morgen ___. (ankommen)');
+  assert.deepEqual([found[1], [...found[2]].sort()], ['komme … an', ['ankomme … —', 'komme … —', 'kommst … an']]);
+  const modal = RULES.find(rule => rule.id === 'modal');
+  assert.ok([...modal.qs, ...modal.extra].every(([prompt]) => !/\((können|müssen|wollen|dürfen|sollen|möchten)\)/.test(prompt)), 'modal cues are English');
+  const app = boot(async () => response({ user: null }));
+  await settle();
+  const complete = (prompt, answer) => app.evaluate(`completedSentence(${JSON.stringify(prompt)},${JSON.stringify(answer)})`);
+  assert.match(complete('Ich ___ morgen ___. (ankommen)', 'komme … an'), />Ich <mark>komme<\/mark> morgen <mark>an<\/mark>\.</);
+  assert.match(complete('Ich ___ morgen ___. (ankommen)', 'ankomme … —'), />Ich <mark>ankomme<\/mark> morgen\.</);
+  assert.equal(app.evaluate("grammarSpeech('Wir ___ abends ___. (fernsehen)','sehen … fern')"), 'Wir sehen abends fern.');
+  assert.equal(app.evaluate("canType(['Ich ___ morgen ___. (ankommen)','komme … an',['ankomme … —']])"), false);
 });
