@@ -7,7 +7,7 @@ An early German A1–A2 practice app with English instructions.
 - German → English and English → German multiple-choice vocabulary exercises.
 - English → German typed recall, letter-building and noun-article (der/die/das) exercises.
 - 1,194 vocabulary entries across 28 topics and 24 grammar topics with 20–80 exercises per round,
-  drawn from a bank of 2,352 grammar exercises.
+  drawn from a bank of 2,328 grammar exercises.
 - Randomized multiple-choice answers use the same part of speech, preferring the same topic and level.
 - Per-word progress: eight correct answers retire a word from normal practice.
 - “I know this” hides a word without awarding XP; restore it under Progress → Words marked known.
@@ -134,10 +134,14 @@ the chart. Marking a word known is not counted as activity.
 
 ## Grammar completion
 
-Accuracy uses only questions already answered, so one correct answer shows 100%,
-not 3% of a 32-question round. First-round completion and the required number of
-correct answers are shown separately. Practice shows accuracy for the current
-visit; the topic overview shows recent accuracy across saved answers. Passing thresholds are unchanged.
+Scores are plain counts with no percentages: how many answers were correct, how
+many have been answered and how many a round has (for example “12 correct · 15
+answered · 32 in a round”), plus the number of correct answers needed to pass.
+Once a round is full, the counts cover the latest answers. Practice shows the
+current set alongside the topic counts. Passing thresholds are unchanged.
+
+Each visit is a set of up to 10 exercises (fewer at the end of a round, or when
+the topic passes). The next visit continues at the saved position in the round.
 
 After a round, **Practise mistakes again** starts a round containing only missed
 items. Further retries narrow to the remaining mistakes. Vocabulary retries follow
@@ -162,9 +166,17 @@ Broad topics have 80 exercises per round for repeated practice across forms and
 contexts; narrower topics keep 20–40 exercises. Each topic’s window equals its
 round size.
 
+Exercises spread their vocabulary instead of repeating one sentence frame: the
+present-tense round uses about 60 different A1 verbs (each at most twice), modal
+verbs pair each of 80 activities with one subject, and the accusative, dative,
+Perfekt, word-order, dass/weil, possessive, demonstrative, Wo/Wohin, separable and
+reflexive rounds use each verb, object or clause only once or twice. Every weil
+clause has its own main clause that it actually explains. The later-round bank
+adds -t/-d and -s/-z spelling patterns (du arbeitest, du tanzt) to present tense.
+
 The first round keeps the curated order. Later rounds draw a deterministic,
 shuffled selection of the same size from the curated exercises plus an extra
-bank (`public/grammar-extra.js`, 852 exercises with more people, nouns, verbs,
+bank (`public/grammar-extra.js`, 828 exercises with more people, nouns, verbs,
 questions and sentence patterns). The selection depends only on the topic and
 round number, so reloading resumes the same exercise. Window sizes, passing
 targets and saved histories are unchanged. The passing target is `ceil(count × 7 / 8)`:
@@ -335,7 +347,7 @@ and [CPU limits](https://developers.cloudflare.com/workers/platform/limits/#cpu-
 - `public/vocabulary.js`: shared vocabulary catalog with permanent word IDs and parts of speech.
 - `public/levels.js`: XP rewards, rank thresholds and legacy XP conversion.
 - `public/grammar.js`: 1,500 first-round grammar exercises across 24 topics.
-- `public/grammar-extra.js`: 852 further exercises mixed into later rounds.
+- `public/grammar-extra.js`: 828 further exercises mixed into later rounds.
 - `public/grammar-config.js`: topic sizes and passing targets shared by client and server.
 - `public/grammar-more.js`: local adverbs, separable/reflexive verbs, participles and countability.
 - `public/grammar-topics.js`: additional foundational topic exercises and explanations.

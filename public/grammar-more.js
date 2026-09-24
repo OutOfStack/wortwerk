@@ -39,17 +39,48 @@ const separableVerbs = [
   ['aufmachen', 'auf', 'mache', 'machst', 'die Tür', 'open the door'],
   ['zumachen', 'zu', 'mache', 'machst', 'das Fenster', 'close the window'],
   ['fernsehen', 'fern', 'sehe', 'siehst', 'abends', 'watch television'],
+  ['aufhören', 'auf', 'höre', 'hörst', 'um fünf Uhr', 'stop'],
+  ['ausfüllen', 'aus', 'fülle', 'füllst', 'das Formular', 'fill in the form'],
+  ['einsteigen', 'ein', 'steige', 'steigst', 'in den Bus', 'get on the bus'],
+  ['aussteigen', 'aus', 'steige', 'steigst', 'am Bahnhof', 'get off at the station'],
+  ['umsteigen', 'um', 'steige', 'steigst', 'in Köln', 'change trains in Cologne'],
+  ['aufwachen', 'auf', 'wache', 'wachst', 'früh', 'wake up early'],
+  ['einschlafen', 'ein', 'schlafe', 'schläfst', 'schnell', 'fall asleep quickly'],
+  ['mitnehmen', 'mit', 'nehme', 'nimmst', 'einen Regenschirm', 'take an umbrella'],
+  ['kennenlernen', 'kennen', 'lerne', 'lernst', 'neue Leute', 'meet new people'],
+  ['anmachen', 'an', 'mache', 'machst', 'den Fernseher', 'switch on the TV'],
 ];
 
-const reflexiveVerbs = [
-  ['freu', 'auf den Urlaub'], ['beeil', ', um den Bus zu erreichen'],
-  ['entspann', 'zu Hause'], ['erinner', 'an den Termin'],
-  ['interessier', 'für Musik'], ['fühl', 'heute gut'],
+// [subject, conjugated verb, rest]: the pronoun goes in the gap; the answer follows the subject.
+const REFLEXIVE = { Ich: 'mich', Du: 'dich', Wir: 'uns', Ihr: 'euch' };
+const reflexiveSentences = [
+  ['Ich', 'freue', 'auf das Wochenende'], ['Du', 'beeilst', ', um den Bus zu erreichen'], ['Anna', 'entspannt', 'zu Hause'],
+  ['Wir', 'erinnern', 'an den Termin'], ['Ihr', 'interessiert', 'für Musik'], ['Die Kinder', 'fühlen', 'heute gut'],
+  ['Ich', 'ärgere', 'über den Lärm'], ['Du', 'beschäftigst', 'mit Musik'], ['Tom', 'bedankt', 'bei der Lehrerin'],
+  ['Wir', 'rasieren', 'jeden Morgen'], ['Ihr', 'duscht', 'nach dem Sport'], ['Meine Eltern', 'erholen', 'im Urlaub'],
+  ['Ich', 'setze', 'auf den Stuhl'], ['Du', 'kämmst', 'vor dem Spiegel'], ['Mein Bruder', 'entschuldigt', 'bei Anna'],
+  ['Wir', 'verabreden', 'für Samstag'], ['Ihr', 'langweilt', 'im Unterricht'], ['Die Gäste', 'beschweren', 'über das Essen'],
+  ['Ich', 'verliebe', 'in Paris'], ['Du', 'gewöhnst', 'an den Lärm'], ['Lena', 'kümmert', 'um die Katze'],
+  ['Wir', 'konzentrieren', 'auf die Arbeit'], ['Ihr', 'informiert', 'über den Kurs'], ['Die Schüler', 'melden', 'für den Kurs an'],
+  ['Ich', 'ziehe', 'schnell an'], ['Du', 'stellst', 'der Gruppe vor'], ['Paul', 'zieht', 'für die Party um'],
+  ['Wir', 'ruhen', 'nach dem Essen aus'], ['Ihr', 'legt', 'kurz hin'], ['Die Kinder', 'waschen', 'vor dem Essen'],
+  ['Ich', 'treffe', 'mit Freunden'], ['Du', 'unterhältst', 'mit dem Nachbarn'], ['Frau Weber', 'irrt', ''],
+  ['Wir', 'bewegen', 'zu wenig'], ['Ihr', 'versteckt', 'hinter dem Baum'], ['Meine Freunde', 'freuen', 'über das Geschenk'],
+  ['Ich', 'wasche', 'jeden Abend'], ['Du', 'verletzt', 'beim Sport'], ['Opa', 'fühlt', 'heute müde'],
+  ['Wir', 'treffen', 'vor dem Kino'], ['Ihr', 'beeilt', 'heute sehr'], ['Die Studenten', 'bewerben', 'um eine Stelle'],
+  ['Ich', 'erinnere', 'an den Urlaub'], ['Du', 'interessierst', 'für Sport'], ['Die Katze', 'versteckt', 'unter dem Bett'],
+  ['Wir', 'setzen', 'an den Tisch'], ['Ihr', 'ärgert', 'über den Regen'], ['Die Nachbarn', 'entschuldigen', 'für den Lärm'],
+  ['Ich', 'dusche', 'nach der Arbeit'], ['Du', 'ziehst', 'warm an'], ['Das Kind', 'freut', 'auf Weihnachten'],
+  ['Wir', 'entspannen', 'am Wochenende'], ['Ihr', 'erholt', 'am Meer'], ['Die Touristen', 'informieren', 'im Hotel'],
+  ['Ich', 'melde', 'morgen wieder'], ['Du', 'langweilst', 'nie'], ['Herr Braun', 'rasiert', 'jeden Morgen'],
+  ['Wir', 'kümmern', 'um den Garten'], ['Ihr', 'konzentriert', 'auf den Test'], ['Meine Eltern', 'verabschieden', 'am Bahnhof'],
+  ['Ich', 'beschäftige', 'mit Geschichte'], ['Du', 'bedankst', 'für die Hilfe'], ['Mia', 'gewöhnt', 'an die neue Schule'],
+  ['Wir', 'stellen', 'kurz vor'], ['Ihr', 'zieht', 'nächste Woche um'], ['Die Kinder', 'streiten', 'oft'],
+  ['Ich', 'lege', 'auf das Sofa'], ['Du', 'verliebst', 'schnell'], ['Lena', 'beschwert', 'beim Chef'],
+  ['Wir', 'verspäten', 'leider'], ['Ihr', 'trefft', 'im Park'], ['Die Freunde', 'verabreden', 'zum Kaffee'],
 ];
-const reflexiveSubjects = [
-  ['Ich', 'e', 'mich'], ['Du', 'st', 'dich'], ['Anna', 't', 'sich'],
-  ['Wir', 'en', 'uns'], ['Ihr', 't', 'euch'], ['Die Kinder', 'en', 'sich'],
-];
+const reflexiveQuestion = ([subject, verb, rest]) =>
+  q(`${subject} ${verb} ___${rest.startsWith(',') || !rest ? '' : ' '}${rest}. (reflexive)`, REFLEXIVE[subject] || 'sich', ['mich', 'dich', 'sich', 'uns', 'euch']);
 
 const participles = [
   ['lernen', 'gelernt'], ['kaufen', 'gekauft'], ['machen', 'gemacht'], ['spielen', 'gespielt'],
@@ -95,15 +126,23 @@ const separated = (subject, context, infinitive, prefix, form) =>
 
 const banks = {
   localadverbs: localAdverbs.map(([prompt, answer, choices]) => q(prompt, answer, choices)),
-  separable: separableVerbs.flatMap(([infinitive, prefix, ich, du, context, meaning]) => [
-    separated('Ich', context, infinitive, prefix, ich),
-    separated('Du', context, infinitive, prefix, du),
-    q(`Ich muss ${context} ___. (${meaning})`, infinitive, [`${ich} ${prefix}`, `${prefix}${ich}`, `${prefix}zu${infinitive.slice(prefix.length)}`]),
-    q(`Ich sage, dass ich ${context} ___. (${infinitive})`, `${prefix}${ich}`, [`${ich} ${prefix}`, `${prefix} ${ich}`, infinitive]),
-  ]),
+  // Each verb gets four exercises; verbs alternate between two sets of subjects and clause types.
+  separable: separableVerbs.flatMap(([infinitive, prefix, ich, du, context, meaning], i) => {
+    const plural = infinitive.slice(prefix.length);
+    return i % 2 === 0 ? [
+      separated('Ich', context, infinitive, prefix, ich),
+      separated('Du', context, infinitive, prefix, du),
+      q(`Ich muss ${context} ___. (${meaning})`, infinitive, [`${ich} ${prefix}`, `${prefix}${ich}`, `${prefix}zu${plural}`]),
+      q(`Ich sage, dass ich ${context} ___. (${infinitive})`, `${prefix}${ich}`, [`${ich} ${prefix}`, `${prefix} ${ich}`, infinitive]),
+    ] : [
+      separated('Paul', context, infinitive, prefix, du.replace(/st$/, 't')),
+      separated('Wir', context, infinitive, prefix, plural),
+      q(`Du willst ${context} ___. (${meaning})`, infinitive, [`${du} ${prefix}`, `${prefix}${du}`, `${prefix}zu${plural}`]),
+      q(`Ich weiß, dass du ${context} ___. (${infinitive})`, `${prefix}${du}`, [`${du} ${prefix}`, `${prefix} ${du}`, infinitive]),
+    ];
+  }),
   reflexive: [
-    ...reflexiveVerbs.flatMap(([stem, context]) => reflexiveSubjects.map(([subject, ending, pronoun]) =>
-      q(`${subject} ${stem}${stem==='erinner'&&ending==='en'?'n':ending} ___${context.startsWith(',') ? '' : ' '}${context}. (reflexive)`, pronoun, ['mich', 'dich', 'sich', 'uns', 'euch']))),
+    ...reflexiveSentences.slice(0, 36).map(reflexiveQuestion),
     q('Ich wasche ___ die Hände. (my own hands)', 'mir', ['mich', 'dir', 'sich']),
     q('Du wäschst ___ die Hände. (your own hands)', 'dir', ['dich', 'mir', 'sich']),
     q('Ich putze ___ die Zähne. (my own teeth)', 'mir', ['mich', 'dir', 'sich']),
@@ -125,22 +164,8 @@ const banks = {
   ],
 };
 
-// Append drills to preserve the existing first-cycle exercise order.
-banks.separable.push(...separableVerbs.flatMap(([infinitive, prefix, , du, context, meaning]) => {
-  const plural = infinitive.slice(prefix.length);
-  return [
-    separated('Paul', context, infinitive, prefix, du.replace(/st$/, 't')),
-    separated('Wir', context, infinitive, prefix, plural),
-    q(`Du willst ${context} ___. (${meaning})`, infinitive, [`${du} ${prefix}`, `${prefix}${du}`, `${prefix}zu${plural}`]),
-    q(`Ich weiß, dass du ${context} ___. (${infinitive})`, `${prefix}${du}`, [`${du} ${prefix}`, `${prefix} ${du}`, infinitive]),
-  ];
-}));
 banks.reflexive.push(
-  ...[
-    ['ärger', 'über den Lärm'], ['beschäftig', 'mit Musik'], ['bedank', 'bei der Lehrerin'],
-    ['rasier', 'jeden Morgen'], ['dusch', 'nach dem Sport'], ['erhol', 'im Urlaub'],
-  ].flatMap(([stem, context]) => reflexiveSubjects.map(([subject, ending, pronoun]) =>
-    q(`${subject} ${stem}${stem === 'ärger' && ending === 'en' ? 'n' : ending} ___ ${context}. (reflexive)`, pronoun, ['mich', 'dich', 'sich', 'uns', 'euch']))),
+  ...reflexiveSentences.slice(36).map(reflexiveQuestion),
   q('Ich kaufe ___ ein Buch. (for myself)', 'mir', ['mich', 'dir', 'sich']),
   q('Du kaufst ___ ein Buch. (for yourself)', 'dir', ['dich', 'mir', 'sich']),
   q('Ich merke ___ die Adresse. (I memorize it)', 'mir', ['mich', 'dir', 'sich']),

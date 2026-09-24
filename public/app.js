@@ -8,6 +8,8 @@ import { RANK_TITLES, MAX_LEVEL, xpForLevel, rankTitle, rankMeaning, levelProgre
 function ruleTheory(rule){const t=THEORY[rule.id];return `<details class="rule-theory"><summary>Theory &amp; examples<span class="theory-rule-name"> · ${esc(rule.title)}</span></summary><div class="theory-body"><p>${esc(t.explanation)}</p><div class="theory-table" role="region" aria-label="${esc(rule.title)} forms" tabindex="0"><table><thead><tr>${t.headers.map(h=>`<th scope="col">${esc(h)}</th>`).join('')}</tr></thead><tbody>${t.rows.map(row=>`<tr>${row.map((cell,i)=>i===0?`<th scope="row">${esc(cell)}</th>`:`<td lang="de">${esc(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table></div><h4>Examples</h4><ul class="theory-examples">${t.examples.map(([de,en])=>`<li><strong lang="de">${esc(de)} ${speakButton(de)}</strong><span>${esc(en)}</span></li>`).join('')}</ul><p class="theory-note"><strong>Remember:</strong> ${esc(t.note)}</p></div></details>`}
 
 const WORD_TARGET=8;
+// A grammar visit is a short set; the topic's full round continues on the next visit.
+const GRAMMAR_SET=10;
 const ACTIVITY_DAYS=60;
 const defaultState={xp:0,xpVersion:XP_VERSION,answered:0,correct:0,wordMastery:{},wordCorrectCounts:{},vocabularyVersion:VOCABULARY_VERSION,knownWordIds:[],grammarVersion:GRAMMAR_VERSION,grammarProgress:{},streak:1,sound:true,activity:[0,0,0,0,0,0,0],activityLog:{}};
 let state=structuredClone(defaultState);
@@ -168,7 +170,7 @@ function renderHelp(){
 ${card('XP',`<table class="help-table"><tbody><tr><th scope="row">Choosing an option or building from letters</th><td>${XP_REWARDS.choice} XP</td></tr><tr><th scope="row">Typing the answer</th><td>${XP_REWARDS.typed} XP</td></tr><tr><th scope="row">Wrong answers and “I know this”</th><td>0 XP</td></tr></tbody></table><p>Every correct answer counts, including grammar topics you have already passed.</p>`)}
 ${card('Levels &amp; ranks',`<p>Level 2 takes 30 XP. Each further level takes 40% more XP than the previous step. Ranks climb through nine materials, from Holz (wood) to Diamant (diamond), three steps each.</p><table class="help-table"><tbody>${levelRows}</tbody></table><p>Level ${MAX_LEVEL} is the top level. XP keeps counting after that. Ranks measure practice, not your German level. The full ladder is on <button class="link" data-view-link="progress">Progress</button>.</p>`)}
 ${card('Vocabulary',`<p>Rounds have 8 words. A word leaves practice after ${WORD_TARGET} correct answers, which cycle through: choosing the English meaning, typing the German, building it from letters, choosing the German word and, for nouns, choosing the article.</p><p>“I know this” hides a word without XP. Bring it back from Progress or the word search.</p>`)}
-${card('Grammar',`<p>Each topic has a round of 20–80 exercises. Accuracy counts only questions you have answered; first-round completion is shown separately. Pass by reaching the topic’s required number of correct answers across a full round. A passed topic stays passed.</p><p>Later rounds shuffle in new sentences. Switch between <strong>Choose</strong> and <strong>Type</strong> during practice. With two gaps, “—” leaves a gap empty.</p>`)}
+${card('Grammar',`<p>Each topic has a round of 20–80 exercises, practised in sets of 10; your place is saved between sets. Scores show how many you got right, how many you have answered and how many a round has. Pass by reaching the topic’s required number of correct answers across a full round. A passed topic stays passed.</p><p>Later rounds shuffle in new sentences. Switch between <strong>Choose</strong> and <strong>Type</strong> during practice. With two gaps, “—” leaves a gap empty.</p>`)}
 ${card('Mistake retries',`<p>After a round, choose <strong>Practise mistakes again</strong> to retry only the items you missed. You can repeat this until you feel confident. Correct retries earn normal XP. Vocabulary retries count toward learning the word; grammar retries are extra practice and leave your topic assessment and saved place unchanged.</p>`)}
 ${card('Typing',`<p>Capitalization is flexible. You can type ä, ö, ü as ae, oe, ue and ß as ss. In vocabulary the article is optional; in grammar it counts.</p>`)}
 ${card('Keyboard',`<p><kbd>1</kbd>–<kbd>9</kbd> choose an answer · <kbd>Enter</kbd> continues. When building words, type letters and use <kbd>Backspace</kbd> to undo.</p>`)}
@@ -179,15 +181,14 @@ ${card('Streaks &amp; saving',`<p>Your streak counts consecutive days with at le
 }
 function ruleStatus(id){return grammarStatus(state.grammarProgress?.[id],id)}
 const percent=(part,size)=>Math.round(part/size*100);
+// Plain counts, no percentages: correct answers, answers given, and the round size.
+function ruleCounts({correct,answered,size}){return `${correct} correct · ${answered} answered · ${size} in a round`}
 function ruleCompletion(progress){
  const {answered,size,target,passed}=progress;
- const completion=answered<size?`First round: ${answered}/${size} answered`:`Latest ${size} answers`;
- return `${completion} · ${passed?'Passed':`Pass with ${target}/${size} correct in a full round`}`;
+ return `${passed?'Passed':`Pass with ${target} correct in a full round`}${answered>=size?` · counts your latest ${size} answers`:''}`;
 }
 function ruleScore(progress){
- const {answered,correct}=progress;
- const accuracy=answered?`Recent accuracy: ${percent(correct,answered)}% · ${correct}/${answered} correct`:'No answers yet';
- return `${accuracy}<span class="grammar-detail">${ruleCompletion(progress)}</span>`;
+ return `${progress.answered?ruleCounts(progress):'No answers yet'}<span class="grammar-detail">${ruleCompletion(progress)}</span>`;
 }
 function nextRule(){return RULES.find(r=>!ruleStatus(r.id).passed)||RULES[0]}
 function renderWords(level='all'){const list=level==='all'?WORDS:WORDS.filter(w=>w.level===level);content.innerHTML=`<section class="page"><span class="eyebrow">Vocabulary</span><h1>Words in motion.</h1><p class="intro">Each word leaves practice after 8 correct answers. Already know one? Choose “I know this”.</p><div class="word-search"><label for="wordQuery">Find a word</label><input id="wordQuery" type="search" placeholder="German or English, e.g. Käse or cheese" autocomplete="off" spellcheck="false"><div id="wordResults" aria-live="polite"></div></div><div class="filters">${['all','A1','A2'].map(x=>`<button class="filter ${x===level?'active':''}" data-level="${x}">${x==='all'?'All levels':x}</button>`).join('')}</div><div class="section-head word-section"><div><h2>${list.length-pendingWords(list).length}/${list.length} words complete</h2><p>Learned through practice or marked known · Colours show gender: <span class="g-der">der</span> · <span class="g-die">die</span> · <span class="g-das">das</span></p></div><button class="primary" data-start="words" data-word-level="${level}">Start mixed practice</button></div><div class="lesson-grid">${Object.entries(groupBy(list,'topic')).map(([topic,arr])=>{const done=arr.length-pendingWords(arr).length;return `<button class="lesson-card" data-topic="${topic}"><span class="lesson-icon">${topic.slice(0,1)}</span><span><h3>${topic}</h3><p>${done}/${arr.length} complete · ${[...new Set(arr.map(x=>x.level))].join(' / ')}</p><span class="bar topic-bar" aria-hidden="true"><span style="width:${done/arr.length*100}%"></span></span></span><span class="score">→</span></button>`}).join('')}</div></section>`;document.querySelectorAll('[data-level]').forEach(b=>b.onclick=()=>renderWords(b.dataset.level));bindLessonButtons();document.querySelectorAll('[data-topic]').forEach(b=>b.onclick=()=>startWords(list.filter(w=>w.topic===b.dataset.topic)));$('#wordQuery').oninput=event=>renderWordResults(event.target.value)}
@@ -207,7 +208,7 @@ function renderGrammar(level='all'){
  const list=level==='all'?RULES:RULES.filter(r=>r.level===level);
  content.innerHTML=`<section class="page"><span class="eyebrow">Grammar gym</span><h1>Repeat until it sticks.</h1><p class="intro">Choose a topic and practise at your own pace. Your place is saved after every answer.</p><div class="filters">${['all','A1','A2'].map(x=>`<button class="filter ${x===level?'active':''}" data-level="${x}">${x==='all'?'All rules':x}</button>`).join('')}</div><div class="rule-list">${list.map(r=>{
   const progress=ruleStatus(r.id);
-  return `<article class="rule"><div><span class="eyebrow">${r.level} · ${progress.passed?'Passed':progress.attempts?'In progress':'Not started'}</span><h3>${r.title}</h3><div class="meta">${r.desc}</div><p class="grammar-score">${ruleScore(progress)}</p><div class="bar" aria-hidden="true"><span style="width:${progress.answered/progress.size*100}%"></span></div><p class="meta">Next: exercise ${progress.next+1} of ${progress.size}</p></div><button class="${progress.attempts?'secondary':'primary'}" data-rule="${r.id}">${progress.passed?'Practise again':progress.attempts?'Continue rule':'Start rule'}</button>${ruleTheory(r)}</article>`;
+  return `<article class="rule${progress.passed?' passed':''}"><div><span class="eyebrow">${r.level} · ${progress.passed?'<span class="passed-badge">✓ Passed</span>':progress.attempts?'In progress':'Not started'}</span><h3>${r.title}</h3><div class="meta">${r.desc}</div><p class="grammar-score">${ruleScore(progress)}</p><div class="bar" aria-hidden="true"><span style="width:${progress.answered/progress.size*100}%"></span></div><p class="meta">Next: exercise ${progress.next+1} of ${progress.size}</p></div><button class="${progress.attempts?'secondary':'primary'}" data-rule="${r.id}">${progress.passed?'Practise again':progress.attempts?'Continue rule':'Start rule'}</button>${ruleTheory(r)}</article>`;
  }).join('')}</div></section>`;
  document.querySelectorAll('[data-level]').forEach(b=>b.onclick=()=>renderGrammar(b.dataset.level));bindLessonButtons();
 }
@@ -291,7 +292,12 @@ function wordForm(word,correctCount){
  const clean=word.de.replace(/^(der|die|das) /,'');
  return {label:'Build the German word',prompt:word.en,answer:clean,kind:'letters',opts:shuffle(clean.split(''))};
 }
-function practiceShell(inner,after=''){content.innerHTML=`<div class="practice-wrap"><section class="practice"><div class="practice-top"><button class="secondary" id="quit">Exit</button><div class="bar"><span style="width:${session.index/session.items.length*100}%"></span></div><strong>${session.index+1}/${session.items.length}</strong></div>${inner}<div id="feedback" class="feedback hidden" role="status"></div>${after}</section></div>`;$('#quit').onclick=()=>go(session.type==='words'?'words':'grammar')}
+function setProgress(){
+ if(!session.limit)return [session.index,session.items.length];
+ const done=session.answered||0;
+ return [done,Math.min(session.limit,done+session.items.length-session.index)];
+}
+function practiceShell(inner,after=''){const [done,total]=setProgress();content.innerHTML=`<div class="practice-wrap"><section class="practice"><div class="practice-top"><button class="secondary" id="quit">Exit</button><div class="bar"><span style="width:${done/total*100}%"></span></div><strong>${done+1}/${total}</strong></div>${inner}<div id="feedback" class="feedback hidden" role="status"></div>${after}</section></div>`;$('#quit').onclick=()=>go(session.type==='words'?'words':'grammar')}
 function choiceButtons(opts,lang){return `<div class="choices">${opts.map((o,i)=>`<button class="choice" data-answer="${esc(o)}"${lang?` lang="${lang}"`:''}><span class="key" aria-hidden="true">${i+1}</span>${esc(o)}</button>`).join('')}</div>`}
 function promptBox(text,lang,spoken=''){return `<div class="prompt${text.length>34?' long':''}"${lang?` lang="${lang}"`:''}>${esc(text)}${speakButton(spoken)}</div>`}
 function renderWordQuestion(){if(session.index>=session.items.length)return finishSession();let w=session.items[session.index],q=wordForm(w,wordCorrect(w));session.current={...q,word:w};let body=`<div class="prompt-label">${session.retry?'Mistake retry · ':session.guided?'Guided practice · ':''}${q.label} · ${wordCorrect(w)}/${WORD_TARGET} correct</div>${promptBox(q.prompt,q.promptLang,q.promptLang==='de'?q.prompt.replace(/^___ /,''):'')}${q.hint?`<p class="prompt-hint">${esc(q.hint)}</p>`:''}`;if(q.kind==='choice')body+=choiceButtons(q.opts,q.optsLang);if(q.kind==='type')body+=`<form class="type-row" id="answerForm"><input id="typed" autocomplete="off" autocapitalize="off" spellcheck="false" lang="de" placeholder="Type in German…" aria-label="Your answer" aria-describedby="answerHint"><button class="primary">Check</button></form><p class="answer-hint" id="answerHint">Article optional · ae, oe, ue and ss accepted</p>`;if(q.kind==='letters')body+=`<div class="answer-slots" id="built" lang="de" aria-live="polite"></div><div class="letters">${q.opts.map((o,i)=>`<button class="letter" data-letter="${esc(o)}" data-i="${i}"${o===' '?' aria-label="space"':''}>${o===' '?'␣':esc(o)}</button>`).join('')}</div><div class="type-row letter-actions"><button class="primary" id="checkBuilt">Check</button><button class="secondary" id="undoLetter">Undo</button><button class="secondary" id="clearLetters">Clear</button></div>`;practiceShell(body,`<div class="word-actions"><button class="secondary" id="knowWord" title="Hide this word from practice · no XP">I know this</button></div>`);$('#knowWord').onclick=markWordKnown;if(q.kind==='choice')document.querySelectorAll('[data-answer]').forEach(b=>b.onclick=()=>answer(b.dataset.answer,b));if(q.kind==='type'){$('#answerForm').onsubmit=e=>{e.preventDefault();answer($('#typed').value)};$('#typed').focus?.()}if(q.kind==='letters')bindLetters(q)}
@@ -308,20 +314,21 @@ function bindLetters(q){
 function startRule(id){
  const rule=RULES.find(r=>r.id===id),progress=ruleStatus(id);
  const cycle=Math.floor(progress.attempts/progress.size);
- session={type:'grammar',rule,cycle,items:exerciseDeck(rule,cycle),index:progress.next,roundCorrect:0,answered:0,missed:[],missedItems:[]};
+ session={type:'grammar',rule,cycle,items:exerciseDeck(rule,cycle),index:progress.next,limit:GRAMMAR_SET,roundCorrect:0,answered:0,missed:[],missedItems:[]};
  renderRuleQuestion();
 }
 function grammarScore(id){
  const answered=session.answered||0;
- const accuracy=answered?`${percent(session.roundCorrect,answered)}% · ${session.roundCorrect}/${answered} correct`:'No answers yet';
- return `${session.retry?'Retry':'This visit'} accuracy: ${accuracy}<span class="grammar-detail">${session.retry?'Extra practice · your topic progress stays unchanged.':ruleCompletion(ruleStatus(id))}</span>`;
+ const visit=`${session.retry?'Retry':'This set'}: ${session.roundCorrect} correct · ${answered} answered`;
+ const progress=ruleStatus(id);
+ return `${visit}<span class="grammar-detail">${session.retry?'Extra practice · your topic progress stays unchanged.':`Topic: ${progress.answered?ruleCounts(progress):'no answers yet'} · ${ruleCompletion(progress)}`}</span>`;
 }
 // Typing suits short answers; sentence-order and two-option questions stay multiple choice.
 function canType(q){return q[1].split(' ').length<=2&&q[2].length>=2}
 function grammarInput(){try{return localStorage.getItem('wortwerk-grammar-input')==='type'?'type':'choice'}catch{return 'choice'}}
 function setGrammarInput(mode){try{localStorage.setItem('wortwerk-grammar-input',mode)}catch{/* The choice still applies to this question. */}if(!session.locked)renderRuleQuestion(mode)}
 function renderRuleQuestion(mode=grammarInput()){
- if(session.justPassed||session.index>=session.items.length)return finishGrammar();
+ if(session.justPassed||session.index>=session.items.length||(session.limit&&session.answered>=session.limit))return finishGrammar();
  const q=session.items[session.index],typed=mode==='type'&&canType(q);
  session.current={answer:q[1],prompt:q[0],kind:typed?'type':'choice'};
  const input=typed?`<form class="type-row" id="answerForm"><input id="typed" autocomplete="off" autocapitalize="off" spellcheck="false" lang="de" placeholder="Type the missing part…" aria-label="Your answer" aria-describedby="answerHint"><button class="primary">Check</button></form><p class="answer-hint" id="answerHint">ae, oe, ue and ss accepted</p>`:choiceButtons(shuffle([q[1],...q[2]]),'de');
@@ -352,9 +359,9 @@ function retryMistakes(){
 }
 function finishGrammar(){
  const progress=ruleStatus(session.rule.id),answered=session.answered||0;
- const title=session.retry?(session.missedItems.length?'Keep building.':'Mistakes revisited!'):session.justPassed?'Rule passed!':progress.passed?'Practice complete.':'Round complete.';
- const intro=session.retry?`You answered ${session.roundCorrect} of ${answered} correctly on retry. Continue the topic from where you left off.`:progress.passed?'You earned a pass for this topic. It stays passed.':'Continue with your recent answers carried over; new answers replace the oldest.';
- content.innerHTML=`<div class="practice-wrap"><section class="practice"><span class="eyebrow">${session.retry?'Mistake retry · ':''}${esc(session.rule.title)}</span><h1>${title}</h1><p class="intro">${intro}</p><div class="stats"><div class="stat"><strong>${answered?`${percent(session.roundCorrect,answered)}%`:'—'}</strong><small>${session.roundCorrect}/${answered} correct this ${session.retry?'retry':'visit'}</small></div><div class="stat"><strong>+${session.roundXp||0}</strong><small>XP earned this visit</small></div></div><p class="grammar-score">${session.retry?'<span class="grammar-detail">Topic assessment · unchanged by retries</span>':''}${ruleScore(progress)}</p><div class="session-actions">${retryButton()}<button class="${session.missedItems?.length?'secondary':'primary'}" id="again">${progress.passed?'Practise topic again':'Continue topic'}</button><button class="secondary" id="done">Back to grammar</button></div>${reviewList(session.missed||[])}</section></div>`;
+ const title=session.retry?(session.missedItems.length?'Keep building.':'Mistakes revisited!'):session.justPassed?'Rule passed!':session.index<session.items.length?'Set complete.':progress.passed?'Practice complete.':'Round complete.';
+ const intro=session.retry?`You answered ${session.roundCorrect} of ${answered} correctly on retry. Continue the topic from where you left off.`:session.index<session.items.length&&!session.justPassed?'Your place is saved. Continue for the next set of exercises.':progress.passed?'You earned a pass for this topic. It stays passed.':'Continue with your recent answers carried over; new answers replace the oldest.';
+ content.innerHTML=`<div class="practice-wrap"><section class="practice"><span class="eyebrow">${session.retry?'Mistake retry · ':''}${esc(session.rule.title)}</span><h1>${title}</h1><p class="intro">${intro}</p><div class="stats"><div class="stat"><strong>${session.roundCorrect}/${answered}</strong><small>correct this ${session.retry?'retry':'set'}</small></div><div class="stat"><strong>+${session.roundXp||0}</strong><small>XP earned this set</small></div></div><p class="grammar-score">${session.retry?'<span class="grammar-detail">Topic assessment · unchanged by retries</span>':''}${ruleScore(progress)}</p><div class="session-actions">${retryButton()}<button class="${session.missedItems?.length?'secondary':'primary'}" id="again">${progress.passed?'Practise topic again':'Continue topic'}</button><button class="secondary" id="done">Back to grammar</button></div>${reviewList(session.missed||[])}</section></div>`;
  $('#again').onclick=()=>startRule(session.rule.id);$('#done').onclick=()=>go('grammar');bindRetry();
 }
 function normalise(s){return s.normalize('NFC').toLowerCase().trim().replace(/[.!?]/g,'').replace(/\s+/g,' ')}
@@ -402,7 +409,7 @@ function answerFeedback(ok,value=''){
  const {answer:correct,prompt=''}=session.current,sentence=completedSentence(prompt,correct);
  const exact=ok&&session.current.kind==='type'&&value.trim()!==correct?`<br>Exact form: <strong lang="de">${esc(correct)}</strong>`:'';
  const spoken=grammarSpeech(prompt,correct);
- return (ok?'Well done.':'Correct answer: <strong lang="de">'+esc(correct)+'</strong>')+exact+(sentence?`<br>${sentence} ${speakButton(spoken)}${translateButton(spoken)}`:spoken?` ${speakButton(spoken)}${translateButton(spoken)}`:'')+(session.justPassed?`<br><strong>Rule passed with ${percent(ruleStatus(session.rule.id).correct,ruleStatus(session.rule.id).size)}%!</strong>`:'');
+ return (ok?'Well done.':'Correct answer: <strong lang="de">'+esc(correct)+'</strong>')+exact+(sentence?`<br>${sentence} ${speakButton(spoken)}${translateButton(spoken)}`:spoken?` ${speakButton(spoken)}${translateButton(spoken)}`:'')+(session.justPassed?`<br><strong>Rule passed: ${ruleStatus(session.rule.id).correct} of ${ruleStatus(session.rule.id).size} correct!</strong>`:'');
 }
 function answer(value,button){
  if(session.locked)return;

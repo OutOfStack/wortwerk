@@ -40,16 +40,16 @@ test('new topics cover plural patterns, pronoun roles and case-sensitive endings
   assert.equal(answerFor('indefinite', 'Ich sehe ___ Tisch. (a / an)'), 'einen');
   assert.equal(answerFor('personal', 'Use a subject pronoun for “das Buch”: ___ ist hier.'), 'es');
   assert.equal(answerFor('personal', 'Use a subject pronoun for “I am addressing an adult formally”: ___ sind hier.'), 'Sie');
-  assert.equal(answerFor('possessive', 'Das ist ___ Buch. (my)'), 'mein');
+  assert.equal(answerFor('possessive', 'Wo ist ___ Buch? (my)'), 'mein');
   assert.equal(answerFor('possessive', 'Wem gehört das Buch? — Das ist ___. (mine)'), 'meins');
-  assert.equal(answerFor('possessive', 'Wem gehört der Tisch? — Das ist ___. (ours)'), 'unserer');
-  assert.equal(answerFor('possessive', 'Das ist ___ Tasche. (your (several friends))'), 'eure');
-  assert.equal(answerFor('possessive', 'Wem gehört das Buch? — Das ist ___. (yours (formal))'), 'Ihres');
+  assert.equal(answerFor('possessive', 'Wem gehört der Koffer? — Das ist ___. (ours)'), 'unserer');
+  assert.equal(answerFor('possessive', 'Das ist ___ Wohnung. (your (several friends))'), 'eure');
+  assert.equal(answerFor('possessive', 'Wessen Wörterbuch ist das? — Das ist ___. (yours (formal))'), 'Ihres');
   assert.equal(answerFor('nominative', 'Das ist ___ Tisch. (the; after sein)'), 'der');
-  assert.equal(answerFor('demonstrative', 'Ich sehe ___ Tisch. (this)'), 'diesen');
-  assert.equal(answerFor('demonstrative', 'Ich stehe bei ___ Tasche. (this)'), 'dieser');
-  assert.equal(answerFor('local', 'Die Lampe ist auf ___ Tisch. (Wo?)'), 'dem');
-  assert.equal(answerFor('local', 'Ich stelle die Lampe auf ___ Tisch. (Wohin? New position.)'), 'den');
+  assert.equal(answerFor('demonstrative', 'Ich nehme ___ Tisch. (this)'), 'diesen');
+  assert.equal(answerFor('demonstrative', 'Ich bin mit ___ Tasche zufrieden. (this)'), 'dieser');
+  assert.equal(answerFor('local', 'Die Vase steht auf ___ Tisch. (Wo?)'), 'dem');
+  assert.equal(answerFor('local', 'Ich lege das Handy auf ___ Tisch. (Wohin? New position.)'), 'den');
   assert.equal(answerFor('wquestions', '___ besucht Anna? — Den Bruder.'), 'Wen');
   assert.equal(answerFor('wquestions', '___ hilft Anna? — Der Schwester.'), 'Wem');
   assert.equal(answerFor('prepositions', 'Anna lernt ___ einem Jahr Deutsch. (for a year, continuing now)'), 'seit');
@@ -140,7 +140,7 @@ test('new topics cover direction, separation, reflexive cases, participles and c
   const answerFor = (id, prompt) => RULES.find(rule => rule.id === id).qs.find(([text]) => text === prompt)?.[1];
   assert.equal(answerFor('localadverbs', 'Ich bin im Haus. Komm zu mir ___. (in, toward the speaker)'), 'herein');
   assert.equal(answerFor('separable', 'Ich sage, dass ich um sieben Uhr ___. (aufstehen)'), 'aufstehe');
-  assert.equal(answerFor('separable', 'Du ___ abends ___. (fernsehen)'), 'siehst … fern');
+  assert.equal(answerFor('separable', 'Paul ___ abends ___. (fernsehen)'), 'sieht … fern');
   assert.equal(answerFor('reflexive', 'Wir erinnern ___ an den Termin. (reflexive)'), 'uns');
   assert.equal(answerFor('reflexive', 'Ich wasche ___ die Hände. (my own hands)'), 'mir');
   assert.equal(answerFor('participle', 'Choose the Partizip II of “anrufen”.'), 'angerufen');
@@ -148,7 +148,7 @@ test('new topics cover direction, separation, reflexive cases, participles and c
   assert.equal(answerFor('countable', 'Ich sehe ___ Bücher. (many individual objects)'), 'viele');
   assert.equal(answerFor('countable', 'Wir haben ___ Wasser. (a lot of the substance, not portions)'), 'viel');
   assert.equal(answerFor('separable', 'Ich weiß, dass du abends ___. (fernsehen)'), 'fernsiehst');
-  assert.equal(answerFor('reflexive', 'Wir ärgern ___ über den Lärm. (reflexive)'), 'uns');
+  assert.equal(answerFor('reflexive', 'Ihr ärgert ___ über den Regen. (reflexive)'), 'euch');
   assert.equal(answerFor('reflexive', 'Du merkst ___ die Adresse. (you memorize it)'), 'dir');
   assert.equal(answerFor('participle', 'Ich bin nach Berlin ___. (fahren, Perfekt)'), 'gefahren');
   assert.equal(answerFor('participle', 'Ich habe Medizin ___. (studieren, Perfekt)'), 'studiert');
@@ -204,10 +204,22 @@ test('conjugation and sentence fixes stay correct', () => {
   assert.ok(all.every(([prompt]) => !/rasiern|informiern|konzentriern/.test(prompt)));
   const find = (id, prompt) => [...RULES.find(rule => rule.id === id).qs, ...RULES.find(rule => rule.id === id).extra].find(([text]) => text === prompt)?.[1];
   assert.equal(find('reflexive', 'Wir rasieren ___ jeden Morgen. (reflexive)'), 'uns');
-  assert.equal(find('reflexive', 'Wir ärgern ___ über den Lärm. (reflexive)'), 'uns');
+  assert.equal(find('reflexive', 'Ich ärgere ___ über den Lärm. (reflexive)'), 'mich');
   assert.equal(find('reflexive', 'Lena und ich kümmern ___ um die Katze. (reflexive)'), 'uns');
-  assert.equal(find('wordorder', 'Choose the correct statement: am Montag / Anna / trinkt / Tee'), 'Am Montag trinkt Anna Tee.');
+  assert.equal(find('wordorder', 'Choose the correct statement: am Wochenende / Anna / trinkt / Tee'), 'Am Wochenende trinkt Anna Tee.');
   assert.equal(find('modal', '___ ich hier rauchen? (be allowed to)'), 'Darf');
   assert.equal(find('perfect', 'Die Kinder ___ in den Park gelaufen. (Perfekt)') ?? find('perfect', 'Mein Bruder ___ in den Park gelaufen. (Perfekt)'), 'ist');
   assert.equal(find('because', 'Ich komme später, weil ___. (ich / muss / noch arbeiten)'), 'ich noch arbeiten muss');
+});
+
+test('grammar sentences vary their verbs and objects instead of repeating a few', () => {
+  const rule = id => RULES.find(r => r.id === id).qs;
+  const most = (items, pick) => Math.max(...Object.values(items.reduce((count, item) => { const k = pick(item); count[k] = (count[k] || 0) + 1; return count; }, {})));
+  assert.ok(most(rule('present'), ([prompt]) => prompt.match(/ (\S+)___/)[1]) <= 2, 'present: each verb stem at most twice');
+  assert.ok(new Set(rule('present').map(([prompt]) => prompt.match(/ (\S+)___/)[1])).size >= 55, 'present: at least 55 different verbs');
+  assert.equal(new Set(rule('modal').map(([prompt]) => prompt.replace(/^.*?___ /, ''))).size, 80, 'modal: every activity is different');
+  assert.ok(most(rule('accusative'), ([prompt]) => prompt.split(' ___ ')[0]) <= 2, 'accusative: frames are not reused');
+  assert.ok(most(rule('local'), ([prompt]) => prompt.split(/ (in|auf|unter|neben|vor|hinter|über|an|zwischen|___) /)[0]) <= 2, 'local: objects change with the place');
+  assert.ok(most(rule('reflexive'), ([prompt]) => prompt.split(' ')[1]) <= 3, 'reflexive: verbs are spread out');
+  assert.equal(new Set(rule('separable').map(([prompt]) => prompt.match(/\((\p{L}+(?: \p{L}+)*)\)$/u)[1])).size >= 30, true, 'separable: 20 verbs with their meanings');
 });

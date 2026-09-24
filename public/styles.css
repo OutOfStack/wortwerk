@@ -105,6 +105,7 @@
 .speak{border:0;background:transparent;padding:2px 6px;margin-left:2px;border-radius:8px;font-size:18px;line-height:1;vertical-align:middle;cursor:pointer;font-family:inherit}.speak:hover{background:var(--line)}.prompt .speak{font-size:24px;margin-left:10px}
 .speech-toggle{margin-right:12px;min-width:44px}.speech-toggle[aria-pressed="false"]{opacity:.65}
 .no-speech .speak,.no-speech .speech-toggle{display:none}
+.rule.passed{background:#eef6ec;border-color:#a9cdaa;box-shadow:inset 4px 0 0 #5b8963}.rule.passed .bar{background:#d7e8d5}.rule.passed .bar span{background:#5b8963}.passed-badge{color:#397148}
 .translate{display:inline-block;border:1px solid var(--line);background:transparent;color:var(--muted);padding:1px 7px;margin-left:4px;border-radius:999px;font-family:inherit;font-weight:700;font-size:12px;line-height:1.5;letter-spacing:.04em;vertical-align:middle;cursor:pointer;text-decoration:none}.translate:hover{background:var(--line);color:inherit}.translation{display:block;margin-top:4px;color:var(--muted);font-style:italic}.translation a{font-style:normal}
 .rank-ladder small{color:var(--muted);font-weight:400;font-size:13px}
 

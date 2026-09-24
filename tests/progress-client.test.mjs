@@ -295,7 +295,7 @@ test('typed answers earn 2 XP, chosen answers 1, and mistakes or double submissi
   app.evaluate("session.locked=false;session.current={answer:'bin',kind:'type',prompt:'Ich ___ müde.'};answer('BIN')");
   assert.equal(app.evaluate('state.xp'), 7, 'typed grammar');
   app.evaluate('finishSession()');
-  assert.match(app.elements.get('#content').innerHTML, /<strong>\+3<\/strong><small>XP earned this visit/);
+  assert.match(app.elements.get('#content').innerHTML, /<strong>\+3<\/strong><small>XP earned this set/);
   assert.equal(JSON.parse(app.storage.get('wortwerk-guest-progress')).xpVersion, 2);
 });
 
@@ -354,7 +354,7 @@ test('grammar resumes immediately after the saved answer, including a reload bef
   await settle();
   reloaded.evaluate("startRule('sein')");
   assert.equal(reloaded.evaluate('session.index'), 1);
-  assert.match(reloaded.elements.get('#content').innerHTML, /This visit accuracy: No answers yet[\s\S]*First round: 1\/32 answered/);
+  assert.match(reloaded.elements.get('#content').innerHTML, /This set: 0 correct · 0 answered[\s\S]*Topic: 1 correct · 1 answered · 32 in a round/);
   reloaded.evaluate("answer('wrong')");
   const accountProgress = JSON.parse(reloaded.storage.get('wortwerk-guest-progress'));
   const accountApp = boot(async path => response(path === '/api/auth/me' ? { user } : { userId: user.id, progress: accountProgress, revision: 4 }));
@@ -370,14 +370,35 @@ test('every grammar topic renders its exercise, theory and saved score', async (
   for (const rule of RULES) {
     app.evaluate(`startRule(${JSON.stringify(rule.id)})`);
     const html = app.elements.get('#content').innerHTML;
-    assert.ok(html.includes(`1/${rule.qs.length}`), rule.id);
+    assert.ok(html.includes(`1/${Math.min(10, rule.qs.length)}</strong>`), rule.id);
     assert.ok(html.includes('Theory &amp; examples'), rule.id);
-    assert.ok(html.includes(`Pass with ${Math.ceil(rule.qs.length * 7 / 8)}/${rule.qs.length} correct in a full round`), rule.id);
-    assert.ok(html.includes('No answers yet'), rule.id);
+    assert.ok(html.includes(`Pass with ${Math.ceil(rule.qs.length * 7 / 8)} correct in a full round`), rule.id);
+    assert.ok(html.includes('Topic: no answers yet'), rule.id);
     assert.doesNotMatch(html, /answers recorded|Keys 1/, rule.id);
   }
   app.evaluate('renderGrammar()');
   assert.equal((app.elements.get('#content').innerHTML.match(/<article class="rule">/g) || []).length, 24);
+});
+
+test('a grammar visit ends after a set of 10 and the next visit continues in place', async () => {
+  const app = boot(async () => response({ user: null }));
+  await settle();
+  app.evaluate("state=structuredClone(defaultState);startRule('present')");
+  for (let i = 0; i < 10; i++) {
+    assert.match(app.elements.get('#content').innerHTML, new RegExp(`<strong>${i + 1}/10</strong>`));
+    app.evaluate(i === 3 ? "answer('wrong')" : 'answer(session.current.answer)');
+    app.elements.get('#next').onclick();
+  }
+  const html = app.elements.get('#content').innerHTML;
+  assert.match(html, /Set complete\./);
+  assert.match(html, /<strong>9\/10<\/strong><small>correct this set/);
+  assert.match(html, /Practise 1 mistake again/);
+  assert.equal(app.evaluate("ruleStatus('present').attempts"), 10);
+  app.elements.get('#again').onclick();
+  assert.equal(app.evaluate('session.index'), 10, 'the next set starts at exercise 11');
+  assert.match(app.elements.get('#content').innerHTML, /<strong>1\/10<\/strong>/);
+  app.evaluate("state.grammarProgress.present={answers:Array(75).fill(true),attempts:75,passed:false};startRule('present')");
+  assert.match(app.elements.get('#content').innerHTML, /<strong>1\/5<\/strong>/, 'the last set of a round is shorter');
 });
 
 test('grammar feedback and Continue appear before the supporting rule and theory', async () => {
@@ -411,8 +432,8 @@ test('shorter cycles carry their score and can pass on the first answer of a lat
   assert.match(app.elements.get('#content').innerHTML, /Rule passed!/);
   assert.equal(app.elements.get('#totalMastery').textContent, '1 grammar rules passed');
   app.evaluate('renderGrammar()');
-  assert.match(app.elements.get('#content').innerHTML, /A1 · Passed/);
-  assert.match(app.elements.get('#content').innerHTML, /Recent accuracy: 88% · 28\/32 correct[\s\S]*Latest 32 answers · Passed/);
+  assert.match(app.elements.get('#content').innerHTML, /<article class="rule passed"><div><span class="eyebrow">A1 · <span class="passed-badge">✓ Passed<\/span>/);
+  assert.match(app.elements.get('#content').innerHTML, /28 correct · 32 answered · 32 in a round[\s\S]*Passed · counts your latest 32 answers/);
   assert.equal(app.evaluate('nextRule().id'), 'present');
 });
 
@@ -534,8 +555,8 @@ test('separable verbs use two gaps so the infinitive cue cannot reveal the prefi
   const separable = RULES.find(rule => rule.id === 'separable');
   const all = [...separable.qs, ...separable.extra];
   assert.ok(all.every(([prompt, answer]) => !/\((\w+)\)$/.test(prompt) || !/^(auf|an|ein|aus|ab|mit|zu|vor|zurück|fern)$/.test(answer)), 'no single-prefix answers with a German infinitive cue');
-  const found = all.find(([prompt]) => prompt === 'Ich ___ morgen ___. (ankommen)');
-  assert.deepEqual([found[1], [...found[2]].sort()], ['komme … an', ['ankomme … —', 'komme … —', '— … ankomme']]);
+  const found = all.find(([prompt]) => prompt === 'Paul ___ morgen ___. (ankommen)');
+  assert.deepEqual([found[1], [...found[2]].sort()], ['kommt … an', ['ankommt … —', 'kommt … —', '— … ankommt']]);
   assert.ok(all.every(([prompt]) => !/___ .* (auf|an|ein|aus|ab|mit|zu|vor|zurück|fern)\. \(/.test(prompt)), 'the sentence never prints the prefix already');
   const persons = ([, answer, options]) => new Set(options.map(option => option.split(' … ').find(part => part !== '—').replace(new RegExp(`^${answer.split(' … ')[1]}`), '')));
   assert.ok(all.filter(([, answer]) => answer.includes(' … ')).every(item => persons(item).size === 1), 'main-clause options all share one verb form, so person agreement gives nothing away');
@@ -626,23 +647,23 @@ test('guided rounds balance revisits and new words, exclude complete words, and 
   assert.equal(app.evaluate('session.type'), 'grammar', 'a finished vocabulary pool has a useful next action');
 });
 
-test('grammar distinguishes unanswered, accuracy, completion, and earned passes', async () => {
+test('grammar scores show counts: correct, answered and round size, without percentages', async () => {
   const app = boot(async () => response({ user: null }), empty());
   await settle();
   app.evaluate("startRule('sein')");
-  assert.match(app.elements.get('#content').innerHTML, /No answers yet/);
+  assert.match(app.elements.get('#content').innerHTML, /Topic: no answers yet/);
   app.evaluate('answer(session.current.answer)');
   const score = app.elements.get('#grammarScore').innerHTML;
-  assert.match(score, /This visit accuracy: 100% · 1\/1 correct/);
-  assert.match(app.evaluate("ruleScore(ruleStatus('sein'))"), /Recent accuracy: 100% · 1\/1 correct/);
-  assert.match(score, /First round: 1\/32 answered/);
-  assert.doesNotMatch(score, /Score 3%|Passed/);
+  assert.match(score, /This set: 1 correct · 1 answered/);
+  assert.match(app.evaluate("ruleScore(ruleStatus('sein'))"), /^1 correct · 1 answered · 32 in a round/);
+  assert.match(score, /Topic: 1 correct · 1 answered · 32 in a round · Pass with 28 correct in a full round/);
+  assert.doesNotMatch(score, /%|Passed/);
   app.elements.get('#next').onclick();
   app.evaluate("answer('wrong')");
-  assert.match(app.elements.get('#grammarScore').innerHTML, /50% · 1\/2 correct/);
+  assert.match(app.elements.get('#grammarScore').innerHTML, /This set: 1 correct · 2 answered/);
   app.evaluate("state.grammarProgress.sein={answers:Array(32).fill(false),attempts:64,passed:true};renderGrammar()");
-  assert.match(app.elements.get('#content').innerHTML, /Recent accuracy: 0% · 0\/32 correct/);
-  assert.match(app.elements.get('#content').innerHTML, /Latest 32 answers · Passed/);
+  assert.match(app.elements.get('#content').innerHTML, /0 correct · 32 answered · 32 in a round/);
+  assert.match(app.elements.get('#content').innerHTML, /Passed · counts your latest 32 answers/);
 });
 
 test('word retries contain only missed words and narrow to remaining mistakes', async () => {

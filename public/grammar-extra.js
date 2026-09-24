@@ -13,7 +13,6 @@ const q = (prompt, answer, choices) => {
 // Person index: 0 ich, 1 du, 2 er / sie / es, 3 wir, 4 ihr, 5 sie / Sie.
 const SEIN = ['bin', 'bist', 'ist', 'sind', 'seid', 'sind'];
 const HABEN = ['habe', 'hast', 'hat', 'haben', 'habt', 'haben'];
-const ENDINGS = ['e', 'st', 't', 'en', 't', 'en'];
 const definite = ['der', 'die', 'das', 'den', 'dem'];
 const indefinite = ['ein', 'eine', 'einen', 'einem', 'einer'];
 const demonstratives = ['dieser', 'diese', 'dieses', 'diesen', 'diesem'];
@@ -35,21 +34,29 @@ const sein = [
   q('Warum ___ du so traurig?', 'bist', SEIN), q('Leider ___ der Zug zu spät.', 'ist', SEIN), q('___ Sie Herr Klein?', 'Sind', SEIN),
 ];
 
-const presentVerbs = [
-  ['besuch', 'die Oma'], ['bezahl', 'die Rechnung'], ['zeig', 'das Foto'], ['schick', 'eine Nachricht'],
-  ['bestell', 'eine Pizza'], ['sag', 'die Wahrheit'], ['kenn', 'den Weg'], ['trink', 'Wasser'],
-  ['schreib', 'eine E-Mail'], ['sing', 'ein Lied'], ['schwimm', 'im See'], ['lach', 'oft'],
-  ['geh', 'ins Kino'], ['komm', 'aus Italien'], ['bleib', 'zu Hause'], ['probier', 'den Kuchen'],
-];
-const presentSubjects = [
-  ['Meine Schwester', 2], ['Herr Braun', 2], ['Die Studenten', 5], ['Lena und ich', 3],
-  ['Du und Ben', 4], ['Ich', 0], ['Du', 1], ['Ihr', 4],
+// Later rounds add the two regular spelling patterns: an extra e after -t / -d / consonant + n
+// (du arbeitest, er öffnet), and only -t for du after -s / -ß / -z (du heißt, du tanzt).
+// [sentence with ___ after the stem, ending, distractors]
+const presentSpelling = [
+  ['Du arbeit___ im Büro.', 'est', ['st', 'et', 't', 'e']], ['Frau Klein arbeit___ heute lange.', 'et', ['t', 'est', 'en', 'e']],
+  ['Ihr wart___ auf den Bus.', 'et', ['t', 'est', 'en', 'e']], ['Ich wart___ vor dem Kino.', 'e', ['est', 'et', 'en', 'st']],
+  ['Die Kinder antwort___ schnell.', 'en', ['et', 'e', 'est', 't']], ['Du antwort___ nicht.', 'est', ['st', 'et', 't', 'e']],
+  ['Tom find___ den Film gut.', 'et', ['t', 'est', 'en', 'e']], ['Wir find___ die Idee super.', 'en', ['et', 'e', 'est', 't']],
+  ['Du öffn___ das Fenster.', 'est', ['st', 'et', 't', 'e']], ['Der Kellner öffn___ die Tür.', 'et', ['t', 'est', 'en', 'e']],
+  ['Die Schüler rechn___ im Kopf.', 'en', ['et', 'e', 'est', 't']], ['Du rechn___ sehr schnell.', 'est', ['st', 'et', 't', 'e']],
+  ['Ihr red___ zu viel.', 'et', ['t', 'est', 'en', 'e']], ['Lena bad___ am Abend.', 'et', ['t', 'est', 'en', 'e']],
+  ['Die Jacke kost___ fünfzig Euro.', 'et', ['t', 'est', 'en', 'e']], ['Du miet___ eine Wohnung.', 'est', ['st', 'et', 't', 'e']],
+  ['Du heiß___ Anna, oder?', 't', ['st', 'est', 'e', 'en']], ['Wie heiß___ ihr?', 't', ['st', 'est', 'e', 'en']],
+  ['Ich heiß___ Tom.', 'e', ['st', 't', 'en', 'est']], ['Du tanz___ sehr gut.', 't', ['st', 'est', 'e', 'en']],
+  ['Wir tanz___ gern Salsa.', 'en', ['e', 't', 'st', 'et']], ['Du sitz___ am Fenster.', 't', ['st', 'est', 'e', 'en']],
+  ['Die Katze sitz___ auf dem Sofa.', 't', ['st', 'est', 'e', 'en']], ['Du reis___ gern.', 't', ['st', 'est', 'e', 'en']],
+  ['Meine Eltern reis___ nach Italien.', 'en', ['e', 't', 'st', 'et']], ['Du schließ___ die Tür.', 't', ['st', 'est', 'e', 'en']],
+  ['Ich schließ___ das Fenster.', 'e', ['st', 't', 'en', 'est']], ['Du putz___ das Bad.', 't', ['st', 'est', 'e', 'en']],
+  ['Ihr putz___ die Küche.', 't', ['st', 'est', 'e', 'en']], ['Du benutz___ das Wörterbuch.', 't', ['st', 'est', 'e', 'en']],
+  ['Du grüß___ die Nachbarn.', 't', ['st', 'est', 'e', 'en']], ['Die Gäste grüß___ freundlich.', 'en', ['e', 't', 'st', 'et']],
 ];
 const present = [
-  ...presentVerbs.flatMap(([stem, rest], i) => [i, i + 3].map(index => {
-    const [subject, person] = pick(presentSubjects, index);
-    return q(`${subject} ${stem}___ ${rest}.`, ENDINGS[person], ['e', 'st', 't', 'en']);
-  })),
+  ...presentSpelling.map(([prompt, answer, others]) => q(prompt, answer, [answer, ...others])),
   q('___ du gern Tennis? (to play)', 'Spielst', ['Spiele', 'Spielt', 'Spielen']),
   q('Wo ___ ihr? (to live)', 'wohnt', ['wohne', 'wohnst', 'wohnen']),
   q('Was ___ Sie beruflich? (to do)', 'machen', ['mache', 'machst', 'macht']),
@@ -463,8 +470,11 @@ const separable = separableVerbs.flatMap(([infinitive, prefix, ich, , er, contex
 const reflexiveVerbs = [['kümmer', 'um die Katze', true], ['verlieb', 'in Paris'], ['gewöhn', 'an das Wetter'], ['konzentrier', 'auf die Arbeit'], ['entschuldig', 'bei der Lehrerin'], ['informier', 'über den Kurs']];
 const reflexiveSubjects = [['Mein Bruder', 't', 'sich'], ['Lena und ich', 'en', 'uns'], ['Du und Tom', 't', 'euch'], ['Meine Eltern', 'en', 'sich'], ['Ich', 'e', 'mich'], ['Du', 'st', 'dich']];
 const reflexive = [
-  ...reflexiveVerbs.flatMap(([stem, context, ern]) => reflexiveSubjects.map(([subject, ending, pronoun]) =>
-    q(`${subject} ${stem}${ern && ending === 'en' ? 'n' : ending} ___ ${context}. (reflexive)`, pronoun, ['mich', 'dich', 'sich', 'uns', 'euch']))),
+  // Two subjects per verb keep later rounds from repeating one sentence six times.
+  ...reflexiveVerbs.flatMap(([stem, context, ern], i) => [0, 1].map(k => {
+    const [subject, ending, pronoun] = pick(reflexiveSubjects, i * 2 + k);
+    return q(`${subject} ${stem}${ern && ending === 'en' ? 'n' : ending} ___ ${context}. (reflexive)`, pronoun, ['mich', 'dich', 'sich', 'uns', 'euch']);
+  })),
   q('Ich wünsche ___ ein Fahrrad. (for myself)', 'mir', ['mich', 'dir', 'sich']),
   q('Du wünschst ___ einen Hund. (for yourself)', 'dir', ['dich', 'mir', 'sich']),
   q('Ich ziehe ___ die Jacke an. (my own jacket)', 'mir', ['mich', 'dir', 'sich']),

@@ -6,8 +6,11 @@ import { EXTRA_BANKS, MODAL_MEANINGS } from './grammar-extra.js';
 // Each tuple is [prompt, correct answer, distractors]. Templates vary subjects
 // and contexts. Curated subsets below keep coverage without padding every topic to 80.
 const question = (prompt, answer, choices) => [prompt, answer, [...new Set(choices)].filter(value => value !== answer)];
+// Two exercises per item, spread over the round: the first pass alternates the two variants
+// (even items get variant A), the second pass gives every item its other variant.
+const twoPasses = (items, make) => [0, 1].flatMap(pass => items.map((item, i) => make(item, i, (i + pass) % 2 === 1)));
 const subjects = ['Ich', 'Du', 'Er', 'Wir', 'Ihr', 'Die Kinder', 'Anna', 'Anna und Paul'];
-const endings = ['e', 'st', 't', 'en', 't', 'en', 't', 'en'];
+const PERSON_ENDINGS = ['e', 'st', 't', 'en', 't', 'en'];
 const seinScenarios = [
   ['Ich ___ nach der langen Reise müde.', 'bin'],
   ['Du ___ heute für das Abendessen verantwortlich.', 'bist'],
@@ -42,28 +45,53 @@ const seinScenarios = [
   ['Der nächste Termin ___ am Dienstag.', 'ist'],
   ['Anna und Paul ___ Eltern von zwei Kindern.', 'sind'],
 ];
-const regularVerbs = [
-  ['lern', 'Deutsch'], ['wohn', 'in Berlin'], ['mach', 'eine Pause'], ['kauf', 'Brot'],
-  ['spiel', 'Tennis'], ['koch', 'Suppe'], ['hör', 'Musik'], ['such', 'den Schlüssel'],
-  ['brauch', 'Hilfe'], ['frag', 'den Lehrer'],
+// [subject, person, stem, rest]: regular verbs whose endings attach directly to the stem
+// (no -t/-d stems, -s/-z stems or vowel changes). Each verb appears at most twice.
+// Person index: 0 ich, 1 du, 2 er / sie / es, 3 wir, 4 ihr, 5 sie (plural).
+const presentSentences = [
+  ['Ich', 0, 'lern', 'Deutsch'], ['Du', 1, 'wohn', 'in Berlin'], ['Anna', 2, 'mach', 'eine Pause'], ['Wir', 3, 'kauf', 'Brot'],
+  ['Ihr', 4, 'spiel', 'Tennis'], ['Die Kinder', 5, 'hör', 'Musik'], ['Tom', 2, 'such', 'den Schlüssel'], ['Meine Eltern', 5, 'brauch', 'Hilfe'],
+  ['Ich', 0, 'frag', 'den Lehrer'], ['Du', 1, 'schreib', 'eine E-Mail'], ['Mein Bruder', 2, 'schwimm', 'im See'], ['Wir', 3, 'sing', 'ein Lied'],
+  ['Ihr', 4, 'koch', 'das Abendessen'], ['Die Studenten', 5, 'trink', 'viel Kaffee'], ['Frau Weber', 2, 'mal', 'ein Bild'], ['Anna und Paul', 5, 'bezahl', 'die Rechnung'],
+  ['Ich', 0, 'frier', 'im Winter'], ['Du', 1, 'hol', 'Brötchen vom Bäcker'], ['Das Kind', 2, 'bleib', 'heute zu Hause'], ['Wir', 3, 'kenn', 'den Weg'],
+  ['Ihr', 4, 'denk', 'oft an den Urlaub'], ['Die Nachbarn', 5, 'glaub', 'das nicht'], ['Der Lehrer', 2, 'sag', '„Guten Morgen“'], ['Die Gäste', 5, 'zeig', 'die Fotos'],
+  ['Ich', 0, 'steh', 'an der Haltestelle'], ['Du', 1, 'lieg', 'noch im Bett'], ['Opa', 2, 'leg', 'die Zeitung auf den Tisch'], ['Wir', 3, 'stell', 'eine Frage'],
+  ['Ihr', 4, 'beginn', 'um acht Uhr'], ['Die Schüler', 5, 'lach', 'oft'], ['Das Baby', 2, 'wein', 'in der Nacht'], ['Tom und Lena', 5, 'bring', 'den Salat'],
+  ['Ich', 0, 'rauch', 'nicht'], ['Du', 1, 'besuch', 'die Oma'], ['Mein Vater', 2, 'bestell', 'eine Pizza'], ['Wir', 3, 'flieg', 'nach Wien'],
+  ['Ihr', 4, 'frühstück', 'um sieben Uhr'], ['Viele Leute', 5, 'lieb', 'Schokolade'], ['Meine Schwester', 2, 'studier', 'Medizin'], ['Die Kinder', 5, 'telefonier', 'mit der Oma'],
+  ['Ich', 0, 'versteh', 'die Frage nicht'], ['Du', 1, 'wiederhol', 'den Satz'], ['Die Sekretärin', 2, 'buchstabier', 'den Namen'], ['Wir', 3, 'bekomm', 'ein Geschenk'],
+  ['Ihr', 4, 'schick', 'eine Nachricht'], ['Meine Freunde', 5, 'verkauf', 'das Auto'], ['Paul', 2, 'dusch', 'am Morgen'], ['Meine Großeltern', 5, 'leb', 'in der Schweiz'],
+  ['Ich', 0, 'spül', 'das Geschirr'], ['Du', 1, 'üb', 'die Wörter'], ['Die Kassiererin', 2, 'zähl', 'das Geld'], ['Wir', 3, 'hoff', 'auf gutes Wetter'],
+  ['Ihr', 4, 'fehl', 'heute im Kurs'], ['Die Kinder', 5, 'schenk', 'der Mutter Blumen'], ['Oma', 2, 'erzähl', 'eine Geschichte'], ['Die Mechaniker', 5, 'reparier', 'den Bus'],
+  ['Ich', 0, 'park', 'vor dem Haus'], ['Du', 1, 'probier', 'den Kuchen'], ['Frau Klein', 2, 'buch', 'ein Hotel'], ['Wir', 3, 'jogg', 'im Park'],
+  ['Ihr', 4, 'fotografier', 'die Kirche'], ['Die Gäste', 5, 'komm', 'aus Italien'], ['Lena', 2, 'geh', 'zu Fuß zur Arbeit'], ['Die Schüler', 5, 'mach', 'die Hausaufgaben'],
+  ['Ich', 0, 'lern', 'für die Prüfung'], ['Du', 1, 'kauf', 'ein neues Handy'], ['Der Nachbar', 2, 'hör', 'laut Radio'], ['Wir', 3, 'such', 'eine Wohnung'],
+  ['Ihr', 4, 'spiel', 'Gitarre'], ['Meine Eltern', 5, 'trink', 'Tee ohne Zucker'], ['Das Mädchen', 2, 'sing', 'im Chor'], ['Die Touristen', 5, 'besuch', 'das Museum'],
+  ['Ich', 0, 'bestell', 'zwei Kaffee'], ['Du', 1, 'komm', 'heute später'], ['Herr Braun', 2, 'wohn', 'allein'], ['Wir', 3, 'koch', 'Nudeln'],
+  ['Ihr', 4, 'schreib', 'einen Brief'], ['Die Kinder', 5, 'schwimm', 'gern'], ['Anna', 2, 'brauch', 'einen neuen Pass'], ['Meine Freunde', 5, 'hol', 'die Getränke'],
 ];
 
-// Singular, non-weak nouns: noun endings remain stable in these article exercises.
-const caseNouns = [
-  ['der', 'Tisch'], ['die', 'Tasche'], ['das', 'Buch'], ['der', 'Stuhl'],
-  ['die', 'Lampe'], ['das', 'Fenster'], ['der', 'Schrank'], ['die', 'Jacke'],
-  ['das', 'Auto'], ['der', 'Ball'], ['die', 'Uhr'], ['das', 'Bild'],
-  ['der', 'Mantel'], ['die', 'Tür'], ['das', 'Fahrrad'], ['der', 'Schlüssel'],
-  ['die', 'Brille'], ['das', 'Hemd'], ['der', 'Hut'], ['die', 'Zeitung'],
+// [frame, gender, noun, sentence end]: every noun keeps its singular form (no weak nouns),
+// and each frame pairs a fitting verb with its object.
+const accusativePairs = [
+  ['Ich trinke', 'der', 'Saft'], ['Du isst', 'das', 'Ei'], ['Wir kaufen', 'der', 'Kühlschrank'], ['Anna trägt', 'der', 'Rock'],
+  ['Paul sucht', 'der', 'Kuli'], ['Ich brauche', 'der', 'Regenschirm'], ['Die Kinder möchten', 'der', 'Ball'], ['Lena packt', 'der', 'Koffer'],
+  ['Wir bestellen', 'der', 'Tee'], ['Mein Opa liest', 'das', 'Buch'], ['Du hast', 'der', 'Pass'], ['Ich nehme', 'der', 'Löffel'],
+  ['Tom öffnet', 'die', 'Flasche'], ['Wir mieten', 'das', 'Auto'], ['Ich finde', 'der', 'Stift'], ['Meine Schwester kauft', 'der', 'Pullover'],
+  ['Du siehst', 'der', 'Bahnhof'], ['Wir besuchen', 'der', 'Onkel'], ['Ich habe', 'der', 'Termin'], ['Frau Weber fragt', 'der', 'Lehrer'],
+  ['Die Studenten brauchen', 'der', 'Computer'], ['Wir tragen', 'der', 'Tisch'], ['Anna schreibt', 'die', 'Postkarte'], ['Du nimmst', 'die', 'Tasse'],
+  ['Ich spüle', 'das', 'Glas'], ['Paul malt', 'der', 'Baum'], ['Wir hören', 'das', 'Lied'], ['Opa repariert', 'der', 'Stuhl'],
+  ['Ich suche', 'der', 'Schrank'], ['Die Kinder essen', 'die', 'Banane'], ['Lena backt', 'die', 'Pizza'], ['Kennst du', 'der', 'Mann', '?'],
+  ['Ich schenke Anna', 'der', 'Hut'], ['Wir sehen', 'das', 'Haus'], ['Tom holt', 'der', 'Rucksack'], ['Ich verkaufe', 'der', 'Fernseher'],
+  ['Meine Eltern haben', 'der', 'Garten'], ['Hast du', 'der', 'Bleistift', '?'], ['Wir suchen', 'der', 'Teppich'], ['Paul bringt', 'die', 'Gabel'],
 ];
-const accusativeFrames = ['Ich sehe', 'Wir brauchen', 'Anna sucht', 'Paul findet'];
 function accusativeQuestions() {
-  return caseNouns.flatMap(([article, noun]) => accusativeFrames.map((frame, index) => {
-    const definite = index % 2 === 0;
+  return twoPasses(accusativePairs, ([frame, article, noun, end = '.'], i, indefinite) => {
+    const definite = !indefinite;
     const forms = definite ? { der: 'den', die: 'die', das: 'das' } : { der: 'einen', die: 'eine', das: 'ein' };
     const choices = definite ? ['der', 'die', 'das', 'den', 'dem'] : ['ein', 'eine', 'einen', 'einem', 'einer'];
-    return question(`${frame} ___ ${noun}. (${definite ? 'the' : 'a / an'})`, forms[article], choices);
-  }));
+    return question(`${frame} ___ ${noun}${end} (${definite ? 'the' : 'a / an'})`, forms[article], choices);
+  });
 }
 
 const dativeVerbs = {
@@ -77,6 +105,19 @@ const dativeVerbs = {
   warten: ['warte', 'wartest', 'warten', 'wartet'],
   stehen: ['stehe', 'stehst', 'stehen', 'steht'],
   sitzen: ['sitze', 'sitzt', 'sitzen', 'sitzt'],
+  schreiben: ['schreibe', 'schreibst', 'schreiben', 'schreibt'],
+  schenken: ['schenke', 'schenkst', 'schenken', 'schenkt'],
+  zeigen: ['zeige', 'zeigst', 'zeigen', 'zeigt'],
+  bringen: ['bringe', 'bringst', 'bringen', 'bringt'],
+  erklären: ['erkläre', 'erklärst', 'erklären', 'erklärt'],
+  danken: ['danke', 'dankst', 'danken', 'dankt'],
+  antworten: ['antworte', 'antwortest', 'antworten', 'antwortet'],
+  gratulieren: ['gratuliere', 'gratulierst', 'gratulieren', 'gratuliert'],
+  spielen: ['spiele', 'spielst', 'spielen', 'spielt'],
+  liegen: ['liege', 'liegst', 'liegen', 'liegt'],
+  arbeiten: ['arbeite', 'arbeitest', 'arbeiten', 'arbeitet'],
+  essen: ['esse', 'isst', 'essen', 'esst'],
+  telefonieren: ['telefoniere', 'telefonierst', 'telefonieren', 'telefoniert'],
 };
 const dativeContexts = [
   ['fahren', 'mit ___ Bus', 'der'], ['fahren', 'mit ___ Zug', 'der'],
@@ -89,13 +130,44 @@ const dativeContexts = [
   ['kommen', 'von ___ Ausstellung', 'die'], ['warten', 'vor ___ Kino', 'das'],
   ['stehen', 'neben ___ Tisch', 'der'], ['stehen', 'hinter ___ Tür', 'die'],
   ['sitzen', 'auf ___ Stuhl', 'der'], ['sitzen', 'neben ___ Fenster', 'das'],
+  ['schreiben', '___ Freund einen Brief', 'der'], ['schenken', '___ Mutter Blumen', 'die'],
+  ['zeigen', '___ Gast das Zimmer', 'der'], ['bringen', '___ Kind ein Glas Wasser', 'das'],
+  ['erklären', '___ Schülerin die Aufgabe', 'die'], ['danken', '___ Lehrer', 'der'],
+  ['antworten', '___ Kollegin', 'die'], ['gratulieren', '___ Nachbarin', 'die'],
+  ['fahren', 'mit ___ Taxi', 'das'], ['spielen', 'mit ___ Hund', 'der'],
+  ['sprechen', 'mit ___ Verkäuferin', 'die'], ['kommen', 'aus ___ Büro', 'das'],
+  ['sitzen', 'unter ___ Baum', 'der'], ['warten', 'vor ___ Bäckerei', 'die'],
+  ['stehen', 'vor ___ Supermarkt', 'der'], ['wohnen', 'neben ___ Kirche', 'die'],
+  ['liegen', 'auf ___ Sofa', 'das'], ['arbeiten', 'in ___ Firma', 'die'],
+  ['essen', 'mit ___ Löffel', 'der'], ['telefonieren', 'mit ___ Ärztin', 'die'],
 ];
 
-const modals = [
-  { verb: 'können', forms: ['kann', 'kannst', 'kann', 'können', 'könnt', 'können', 'kann', 'können'], contexts: ['Deutsch sprechen', 'heute kommen', 'gut schwimmen', 'hier warten'] },
-  { verb: 'müssen', forms: ['muss', 'musst', 'muss', 'müssen', 'müsst', 'müssen', 'muss', 'müssen'], contexts: ['früh aufstehen', 'heute arbeiten', 'jetzt gehen'] },
-  { verb: 'wollen', forms: ['will', 'willst', 'will', 'wollen', 'wollt', 'wollen', 'will', 'wollen'], contexts: ['Pizza essen', 'Deutsch lernen', 'nach Berlin fahren'] },
-];
+const MODAL_FORMS = {
+  können: ['kann', 'kannst', 'kann', 'können', 'könnt', 'können', 'kann', 'können'],
+  müssen: ['muss', 'musst', 'muss', 'müssen', 'müsst', 'müssen', 'muss', 'müssen'],
+  wollen: ['will', 'willst', 'will', 'wollen', 'wollt', 'wollen', 'will', 'wollen'],
+};
+// Every activity appears once; the subject cycles through all eight persons.
+const modalActivities = {
+  können: ['Deutsch sprechen', 'gut schwimmen', 'heute nicht kommen', 'Gitarre spielen', 'schnell laufen', 'sehr gut kochen', 'Auto fahren',
+    'hier warten', 'morgen helfen', 'den Text lesen', 'gut singen', 'Ski fahren', 'das Wort buchstabieren', 'leider nicht bleiben', 'gut tanzen',
+    'Fußball spielen', 'Kuchen backen', 'das Formular ausfüllen', 'bis hundert zählen', 'ein Pferd malen', 'den Weg finden', 'Englisch verstehen',
+    'die Tür öffnen', 'gut zeichnen', 'am Montag arbeiten', 'die Rechnung bezahlen', 'heute Abend telefonieren'],
+  müssen: ['früh aufstehen', 'heute arbeiten', 'jetzt gehen', 'zum Arzt gehen', 'viel lernen', 'die Hausaufgaben machen', 'den Bus nehmen',
+    'die Küche putzen', 'lange warten', 'Tabletten nehmen', 'das Zimmer aufräumen', 'die Oma besuchen', 'heute kochen', 'den Schlüssel suchen',
+    'eine E-Mail schreiben', 'zur Schule gehen', 'pünktlich sein', 'leise sein', 'die Wörter wiederholen', 'eine Pause machen',
+    'das Fahrrad reparieren', 'im Büro bleiben', 'Brot kaufen', 'die Miete bezahlen', 'den Müll wegbringen', 'das Formular unterschreiben',
+    'das Fenster schließen'],
+  wollen: ['Pizza essen', 'nach Berlin fahren', 'ein Eis kaufen', 'ins Kino gehen', 'am Samstag tanzen', 'eine Reise machen', 'im Garten spielen',
+    'ein Haus kaufen', 'Tennis spielen', 'einen Hund haben', 'heute Abend fernsehen', 'nach Hause gehen', 'Freunde treffen', 'ein Buch lesen',
+    'Spanisch lernen', 'im See schwimmen', 'Musik hören', 'am Meer wohnen', 'lange schlafen', 'eine Wohnung mieten', 'neue Schuhe kaufen',
+    'die Oma anrufen', 'ein Foto machen', 'Tee trinken', 'eine Party feiern', 'mit dem Zug fahren'],
+};
+// Rotate können → müssen → wollen so neighbouring exercises use different modals.
+const modalSentences = Array.from({ length: 80 }, (_, i) => {
+  const verb = ['können', 'müssen', 'wollen'][i % 3];
+  return [verb, modalActivities[verb][Math.floor(i / 3)]];
+});
 
 // Explicit subjects avoid the ambiguous singular/plural "sie".
 const clauses = [
@@ -109,8 +181,19 @@ const clauses = [
   ['ich', 'sehe', 'den Bus', 'sehen'], ['du', 'findest', 'die Tasche', 'finden'],
   ['Anna', 'macht', 'Kaffee', 'machen'], ['wir', 'sehen', 'einen Film', 'sehen'],
   ['ihr', 'übt', 'Deutsch', 'üben'], ['Paul', 'holt', 'das Fahrrad', 'holen'],
+  ['du', 'spielst', 'Gitarre', 'spielen'], ['Anna', 'fährt', 'nach Hamburg', 'fahren'],
+  ['wir', 'kochen', 'Nudeln', 'kochen'], ['ihr', 'besucht', 'die Oma', 'besuchen'],
+  ['die Kinder', 'spielen', 'im Garten', 'spielen'], ['ich', 'schreibe', 'eine Postkarte', 'schreiben'],
+  ['du', 'kaufst', 'Blumen', 'kaufen'], ['Anna', 'schwimmt', 'im See', 'schwimmen'],
+  ['wir', 'fliegen', 'nach Spanien', 'fliegen'], ['ihr', 'tanzt', 'im Club', 'tanzen'],
+  ['Paul', 'repariert', 'das Auto', 'reparieren'], ['die Kinder', 'schlafen', 'sehr lange', 'schlafen'],
+  ['ich', 'bezahle', 'die Rechnung', 'bezahlen'], ['du', 'wartest', 'auf den Bus', 'warten'],
+  ['Anna', 'singt', 'im Chor', 'singen'], ['wir', 'bleiben', 'zu Hause', 'bleiben'],
+  ['ihr', 'lernt', 'für den Test', 'lernen'], ['Paul', 'arbeitet', 'im Büro', 'arbeiten'],
+  ['die Kinder', 'malen', 'ein Bild', 'malen'], ['ich', 'gehe', 'ins Kino', 'gehen'],
 ];
-const timePhrases = ['Heute', 'Am Montag', 'Am Abend', 'Morgen'];
+// Each clause appears with two different time phrases.
+const timePhrases = ['Heute', 'Am Montag', 'Am Abend', 'Morgen', 'Jetzt', 'Am Wochenende', 'Um acht Uhr', 'Im Sommer', 'Danach'];
 
 // [infinitive, participle, auxiliary, context, first-person present, preterite]
 const perfectVerbs = [
@@ -134,23 +217,53 @@ const perfectVerbs = [
   ['kommen', 'gekommen', 'sein', 'zu spät', 'komme', 'kam'],
   ['bleiben', 'geblieben', 'sein', 'zu Hause', 'bleibe', 'blieb'],
   ['aufstehen', 'aufgestanden', 'sein', 'früh', 'stehe auf', 'stand auf'],
+  ['tanzen', 'getanzt', 'haben', 'im Club', 'tanze', 'tanzte'],
+  ['wohnen', 'gewohnt', 'haben', 'in Wien', 'wohne', 'wohnte'],
+  ['bezahlen', 'bezahlt', 'haben', 'die Rechnung', 'bezahle', 'bezahlte'],
+  ['fragen', 'gefragt', 'haben', 'den Lehrer', 'frage', 'fragte'],
+  ['warten', 'gewartet', 'haben', 'lange', 'warte', 'wartete'],
+  ['schlafen', 'geschlafen', 'haben', 'gut', 'schlafe', 'schlief'],
+  ['sprechen', 'gesprochen', 'haben', 'mit dem Lehrer', 'spreche', 'sprach'],
+  ['nehmen', 'genommen', 'haben', 'den Bus', 'nehme', 'nahm'],
+  ['helfen', 'geholfen', 'haben', 'der Nachbarin', 'helfe', 'half'],
+  ['singen', 'gesungen', 'haben', 'ein Lied', 'singe', 'sang'],
+  ['bringen', 'gebracht', 'haben', 'Blumen', 'bringe', 'brachte'],
+  ['anrufen', 'angerufen', 'haben', 'die Oma', 'rufe an', 'rief an'],
+  ['einkaufen', 'eingekauft', 'haben', 'im Supermarkt', 'kaufe ein', 'kaufte ein'],
+  ['fliegen', 'geflogen', 'sein', 'nach Rom', 'fliege', 'flog'],
+  ['laufen', 'gelaufen', 'sein', 'in den Park', 'laufe', 'lief'],
+  ['ankommen', 'angekommen', 'sein', 'spät', 'komme an', 'kam an'],
+  ['reisen', 'gereist', 'sein', 'nach Italien', 'reise', 'reiste'],
+  ['wandern', 'gewandert', 'sein', 'in den Bergen', 'wandere', 'wanderte'],
+  ['einschlafen', 'eingeschlafen', 'sein', 'sofort', 'schlafe ein', 'schlief ein'],
+  ['aufwachen', 'aufgewacht', 'sein', 'früh', 'wache auf', 'wachte auf'],
 ];
 
-// All scenarios use clauses that are grammatical both as reported statements
-// (dass) and as reasons (weil); the task selects a complete subordinate clause.
+// [subject, rest, verb, wrong verb form, main clause for weil]. Each clause is practised once as a
+// reported statement (dass) and once as a reason whose main clause it actually explains.
 const reasons = [
-  ['ich', 'müde', 'bin', 'bist'], ['du', 'krank', 'bist', 'bin'],
-  ['Anna', 'Hunger', 'hat', 'habe'], ['wir', 'Zeit', 'haben', 'hat'],
-  ['ihr', 'Hilfe', 'braucht', 'brauchen'], ['Paul', 'Deutsch', 'lernt', 'lernen'],
-  ['die Kinder', 'zu Hause', 'sind', 'ist'], ['ich', 'Kaffee', 'trinke', 'trinkt'],
-  ['du', 'in Berlin', 'wohnst', 'wohnen'], ['Anna', 'heute', 'arbeitet', 'arbeiten'],
-  ['wir', 'Brot', 'kaufen', 'kauft'], ['ihr', 'Musik', 'hört', 'hören'],
-  ['Paul', 'Suppe', 'kocht', 'kochen'], ['die Kinder', 'Tennis', 'spielen', 'spielt'],
-  ['ich', 'den Schlüssel', 'suche', 'sucht'], ['du', 'eine Pause', 'brauchst', 'brauchen'],
-  ['Anna', 'ein Buch', 'liest', 'lesen'], ['wir', 'einen Brief', 'schreiben', 'schreibt'],
-  ['ihr', 'heute', 'kommt', 'kommen'], ['Paul', 'den Bus', 'nimmt', 'nehmen'],
+  ['ich', 'müde', 'bin', 'bist', 'Ich gehe ins Bett'], ['du', 'krank', 'bist', 'bin', 'Du bleibst zu Hause'],
+  ['Anna', 'Hunger', 'hat', 'habe', 'Anna geht in die Küche'], ['wir', 'Zeit', 'haben', 'hat', 'Wir gehen spazieren'],
+  ['ihr', 'Hilfe', 'braucht', 'brauchen', 'Ich komme zu euch'], ['Paul', 'Deutsch', 'lernt', 'lernen', 'Paul kauft ein Wörterbuch'],
+  ['die Kinder', 'zu Hause', 'sind', 'ist', 'Es ist laut'], ['ich', 'Kaffee', 'trinke', 'trinkt', 'Ich bin wach'],
+  ['du', 'in Berlin', 'wohnst', 'wohnen', 'Wir fahren nach Berlin'], ['Anna', 'heute', 'arbeitet', 'arbeiten', 'Anna hat keine Zeit'],
+  ['wir', 'Brot', 'kaufen', 'kauft', 'Wir gehen zum Bäcker'], ['ihr', 'Musik', 'hört', 'hören', 'Ihr hört mich nicht'],
+  ['Paul', 'Suppe', 'kocht', 'kochen', 'Es riecht gut'], ['die Kinder', 'Tennis', 'spielen', 'spielt', 'Die Kinder sind im Park'],
+  ['ich', 'den Schlüssel', 'suche', 'sucht', 'Ich komme zu spät'], ['du', 'eine Pause', 'brauchst', 'brauchen', 'Du setzt dich hin'],
+  ['Anna', 'ein Buch', 'liest', 'lesen', 'Anna ist ganz leise'], ['wir', 'einen Brief', 'schreiben', 'schreibt', 'Wir brauchen eine Briefmarke'],
+  ['ihr', 'heute', 'kommt', 'kommen', 'Ich koche viel'], ['Paul', 'den Bus', 'nimmt', 'nehmen', 'Paul ist pünktlich'],
+  ['ich', 'keine Zeit', 'habe', 'hat', 'Ich komme nicht mit'], ['du', 'heute Geburtstag', 'hast', 'habe', 'Ich backe einen Kuchen'],
+  ['Anna', 'in Wien', 'wohnt', 'wohnen', 'Anna spricht Deutsch'], ['wir', 'müde', 'sind', 'ist', 'Wir gehen früh schlafen'],
+  ['ihr', 'jeden Tag', 'übt', 'üben', 'Ihr spielt sehr gut'], ['Paul', 'krank', 'ist', 'sind', 'Paul geht zum Arzt'],
+  ['die Kinder', 'Durst', 'haben', 'hat', 'Ich kaufe Wasser'], ['ich', 'am Wochenende', 'arbeite', 'arbeitet', 'Ich habe am Montag frei'],
+  ['du', 'gern', 'tanzt', 'tanzen', 'Du gehst oft in den Club'], ['Anna', 'viel', 'schläft', 'schlafen', 'Anna ist nie müde'],
+  ['wir', 'heute', 'feiern', 'feiert', 'Wir kaufen Getränke'], ['ihr', 'im Park', 'joggt', 'joggen', 'Ihr seid fit'],
+  ['Paul', 'schnell', 'fährt', 'fahren', 'Paul ist schon da'], ['die Kinder', 'draußen', 'spielen', 'spielt', 'Die Kinder sind glücklich'],
+  ['ich', 'oft Termine', 'vergesse', 'vergisst', 'Ich schreibe alles auf'], ['du', 'die Antwort', 'weißt', 'weiß', 'Du hebst die Hand'],
+  ['Anna', 'einen Hund', 'hat', 'haben', 'Anna geht oft spazieren'], ['wir', 'den Zug', 'nehmen', 'nimmt', 'Wir brauchen kein Auto'],
+  ['ihr', 'zu spät', 'kommt', 'kommen', 'Der Lehrer ist böse'], ['die Kinder', 'Ferien', 'haben', 'hat', 'Die Schule ist leer'],
 ];
-const subordinateFrames = ['Ich weiß, dass', 'Es stimmt, dass', 'Das ist wichtig, weil', 'Ich freue mich, weil'];
+const dassFrames = ['Ich weiß, dass', 'Es stimmt, dass', 'Ich glaube, dass', 'Er sagt, dass'];
 
 // [base, comparative, superlative, comparative context, superlative context]
 const comparisons = [
@@ -178,35 +291,46 @@ const comparisons = [
 
 const banks = {
   sein: seinScenarios.map(([prompt, answer]) => question(prompt, answer, ['bin', 'bist', 'ist', 'sind', 'seid'])),
-  present: regularVerbs.flatMap(([stem, rest]) => subjects.map((subject, i) => question(`${subject} ${stem}___ ${rest}.`, endings[i], ['e', 'st', 't', 'en']))),
+  present: presentSentences.map(([subject, person, stem, rest]) => question(`${subject} ${stem}___ ${rest}.`, PERSON_ENDINGS[person], ['e', 'st', 't', 'en'])),
   articles: WORDS.filter(word => word.pos === 'noun').slice(0, 80).map(word => {
     const [article, ...noun] = word.de.split(' ');
     return question(`___ ${noun.join(' ')} (nominative: the)`, article, ['der', 'die', 'das', 'den']);
   }),
   accusative: accusativeQuestions(),
-  modal: modals.flatMap(modal => modal.contexts.flatMap(context => subjects.map((subject, i) => question(`${subject} ___ ${context}. (${MODAL_MEANINGS[modal.verb]})`, modal.forms[i], modal.forms)))),
-  wordorder: clauses.flatMap(([subject, verb, rest]) => timePhrases.map(time => question(
-    // Only the sentence-initial capital is dropped: am Montag, not am montag.
-    `Choose the correct statement: ${time[0].toLowerCase()}${time.slice(1)} / ${subject} / ${verb} / ${rest}`,
-    `${time} ${verb} ${subject} ${rest}.`,
-    [`${time} ${subject} ${verb} ${rest}.`, `${time} ${subject} ${rest} ${verb}.`, `${time} ${rest} ${subject} ${verb}.`],
-  ))),
-  perfect: perfectVerbs.flatMap(([infinitive, participle, auxiliary, context, present, past]) => [
-    question(`Ich ___ ${context} ${participle}. (Perfekt)`, auxiliary === 'sein' ? 'bin' : 'habe', ['bin', 'habe', 'ist', 'hat']),
-    question(`Wir ___ ${context} ${participle}. (Perfekt)`, auxiliary === 'sein' ? 'sind' : 'haben', ['sind', 'haben', 'seid', 'habt']),
-    question(`Anna ${auxiliary === 'sein' ? 'ist' : 'hat'} ${context} ___. (${infinitive}, Perfekt)`, participle, [infinitive, present, past]),
-    question(`Du ${auxiliary === 'sein' ? 'bist' : 'hast'} ${context} ___. (${infinitive}, Perfekt)`, participle, [infinitive, present, past]),
-  ]),
-  dative: dativeContexts.flatMap(([verb, context, article]) => ['Ich', 'Du', 'Wir', 'Ihr'].map((subject, i) => {
+  modal: modalSentences.map(([verb, activity], i) => question(`${subjects[i % 8]} ___ ${activity}. (${MODAL_MEANINGS[verb]})`, MODAL_FORMS[verb][i % 8], MODAL_FORMS[verb])),
+  // Each clause appears twice, once per half of the round, with a different time phrase.
+  wordorder: twoPasses(clauses, ([subject, verb, rest], i, second) => {
+    const time = timePhrases[(2 * i + (second ? 1 : 0)) % timePhrases.length];
+    return question(
+      // Only the sentence-initial capital is dropped: am Montag, not am montag.
+      `Choose the correct statement: ${time[0].toLowerCase()}${time.slice(1)} / ${subject} / ${verb} / ${rest}`,
+      `${time} ${verb} ${subject} ${rest}.`,
+      [`${time} ${subject} ${verb} ${rest}.`, `${time} ${subject} ${rest} ${verb}.`, `${time} ${rest} ${subject} ${verb}.`],
+    );
+  }),
+  // Each verb gets one auxiliary item and one participle item, in separate halves of the round.
+  perfect: twoPasses(perfectVerbs, ([infinitive, participle, auxiliary, context, present, past], i, participleItem) => {
+    const sein = auxiliary === 'sein';
+    if (participleItem) return i % 2 === 0
+      ? question(`Anna ${sein ? 'ist' : 'hat'} ${context} ___. (${infinitive}, Perfekt)`, participle, [infinitive, present, past])
+      : question(`Du ${sein ? 'bist' : 'hast'} ${context} ___. (${infinitive}, Perfekt)`, participle, [infinitive, present, past]);
+    return i % 2 === 0
+      ? question(`Ich ___ ${context} ${participle}. (Perfekt)`, sein ? 'bin' : 'habe', ['bin', 'habe', 'ist', 'hat'])
+      : question(`Wir ___ ${context} ${participle}. (Perfekt)`, sein ? 'sind' : 'haben', ['sind', 'haben', 'seid', 'habt']);
+  }),
+  // Each context appears once with the (ich / du) and once with a / an (wir / ihr).
+  dative: twoPasses(dativeContexts, ([verb, context, article], c, indefinite) => {
+    const i = (indefinite ? 2 : 0) + Math.floor(c / 2) % 2, subject = ['Ich', 'Du', 'Wir', 'Ihr'][i];
     const definite = i < 2;
     const forms = definite ? { der: 'dem', die: 'der', das: 'dem' } : { der: 'einem', die: 'einer', das: 'einem' };
     return question(`${subject} ${dativeVerbs[verb][i]} ${context}. (${definite ? 'the' : 'a / an'})`, forms[article],
       definite ? ['der', 'die', 'das', 'den', 'dem'] : ['ein', 'eine', 'einen', 'einem', 'einer']);
-  })),
-  because: reasons.flatMap(([subject, rest, verb, wrongVerb]) => subordinateFrames.map(frame => question(
-    `${frame} ___. (${subject} / ${verb} / ${rest})`, `${subject} ${rest} ${verb}`,
+  }),
+  // First pass: even clauses with dass, odd with weil; the second pass swaps them.
+  because: twoPasses(reasons, ([subject, rest, verb, wrongVerb, mainClause], i, useWeil) => question(
+    `${useWeil ? `${mainClause}, weil` : dassFrames[i % dassFrames.length]} ___. (${subject} / ${verb} / ${rest})`, `${subject} ${rest} ${verb}`,
     [`${subject} ${verb} ${rest}`, `${verb} ${subject} ${rest}`, `${subject} ${rest} ${wrongVerb}`],
-  ))),
+  )),
   comparative: comparisons.flatMap(([base, comparative, superlative, comparativeContext, superlativeContext]) => [
     question(`Choose the comparative of “${base}”.`, comparative, [base, superlative, `${comparative}e`]),
     question(`Choose the superlative with “am” of “${base}”.`, superlative, [base, comparative, `am ${comparative}`]),
@@ -217,7 +341,7 @@ const banks = {
 
 export const RULES = [
   { id: 'sein', level: 'A1', title: 'sein — to be', desc: 'ich bin, du bist, er/sie ist…', tip: 'Choose the form of sein that matches the subject.' },
-  { id: 'present', level: 'A1', title: 'Verbkonjugation — present tense', desc: 'Regular verb endings; sein and modals have their own rules', tip: 'Remove -en and add: -e, -st, -t, -en, -t, -en.' },
+  { id: 'present', level: 'A1', title: 'Verbkonjugation — present tense', desc: 'Regular verb endings; sein and modals have their own rules', tip: 'Remove -en and add: -e, -st, -t, -en, -t, -en. After -t, -d or consonant + n add an e (du arbeitest, er öffnet); after -s, -ß or -z, du adds only -t (du heißt).' },
   { id: 'articles', level: 'A1', title: 'Articles: der, die, das', desc: 'Gender and definite articles', tip: 'Choose the nominative article. Learn every noun together with its article.' },
   { id: 'accusative', level: 'A1', title: 'Accusative case', desc: 'Direct objects and einen', tip: 'Only masculine articles change: der → den, ein → einen. Use the / a hint to select the article type.' },
   { id: 'modal', level: 'A1', title: 'Modal verbs', desc: 'können, müssen, wollen, dürfen, sollen, möchten', tip: 'Conjugate the modal verb for the subject; the other verb stays in the infinitive at the end. The English cue names the modal.' },
@@ -228,11 +352,7 @@ export const RULES = [
   { id: 'comparative', level: 'A2', title: 'Komparativ & Superlativ', desc: 'größer, besser, am besten', tip: 'Use the comparative with als, and am + superlative for the highest degree.' },
 ].map(rule => {
   const retained = (_, i) => ({
-  sein: i < 32, present: i < 48, articles: i < 48,
-  accusative: i % 4 < 2, modal: i < 16 || (i >= 32 && i < 48) || (i >= 56 && i < 72),
-  wordorder: i % 4 < 2, perfect: i % 4 === 0 || i % 4 === 2,
-  dative: i % 4 === 0 || i % 4 === 2, because: i % 4 === 0 || i % 4 === 2,
-  comparative: i % 4 >= 2,
+  sein: i < 32, articles: i < 48, comparative: i % 4 >= 2,
   })[rule.id];
   const previous = banks[rule.id].filter(retained);
   // Keep the existing sequence first so unfinished first cycles resume in place.

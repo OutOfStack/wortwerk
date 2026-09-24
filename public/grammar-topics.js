@@ -47,6 +47,22 @@ const definite = ['der', 'die', 'das', 'den', 'dem'];
 const indefinite = ['ein', 'eine', 'einen', 'einem', 'einer'];
 const demonstratives = ['dieser', 'diese', 'dieses', 'diesen', 'diesem'];
 const names = ['Anna', 'Paul', 'Lea', 'Tom'];
+const indefiniteSubjectFrames = ['Das ist', 'Hier ist', 'Dort ist', 'Da ist', 'Im Zimmer ist', 'Links ist', 'Rechts ist'];
+const indefiniteObjectFrames = ['Ich sehe', 'Wir kaufen', 'Lena sucht', 'Ich brauche', 'Tom hat', 'Wir möchten', 'Ich nehme', 'Du findest', 'Paul verkauft', 'Die Kinder malen'];
+// A wider noun pool for possessives: each of the 40 owner/noun pairs uses a different noun.
+const possessiveNouns = [...nouns,
+  ['der', 'Koffer'], ['die', 'Tasse'], ['das', 'Radio'], ['der', 'Rucksack'], ['die', 'Flasche'],
+  ['das', 'Heft'], ['der', 'Pullover'], ['die', 'Wohnung'], ['das', 'Zimmer'], ['der', 'Hund'],
+  ['die', 'Brieftasche'], ['das', 'Kleid'], ['der', 'Kuli'], ['die', 'Kamera'], ['das', 'Sofa'],
+  ['der', 'Teller'], ['die', 'Mütze'], ['das', 'Wörterbuch'], ['der', 'Kalender'], ['die', 'Handtasche'],
+];
+const possessiveFrames = ['Das ist ___ {noun}.', 'Hier ist ___ {noun}.', 'Wo ist ___ {noun}?'];
+const ownerQuestions = ['Wem gehört {article} {noun}? — Das ist ___.', 'Wessen {noun} ist das? — Das ist ___.'];
+// Demonstrative frames: nominative subject, accusative object, dative after mit / an / von, and a “which one” answer.
+const demoSubject = ['ist neu', 'gefällt mir', 'ist sehr schön', 'ist zu teuer', 'ist schon alt'];
+const demoObject = ['Ich nehme', 'Wir kaufen', 'Ich möchte', 'Siehst du', 'Magst du'];
+const demoDative = ['Was ist mit ___ {noun}?', 'Ich bin mit ___ {noun} zufrieden.', 'Das Preisschild hängt an ___ {noun}.', 'Ich spreche von ___ {noun}.'];
+const demoWhich = [['meinst', 'meine'], ['nimmst', 'nehme'], ['möchtest', 'möchte'], ['kaufst', 'kaufe']];
 
 // English cues disambiguate prepositions that could otherwise fit a sentence.
 const prepositionContexts = [
@@ -64,15 +80,29 @@ const prepositionContexts = [
 
 // Static location versus a new destination with all nine Wechselpräpositionen.
 // Between-contexts supply the second noun separately for each case.
+// [preposition, gender, noun, where (subject + position verb), where to (subject + verb + object),
+//  dative tail, accusative tail]: every place has its own objects and fitting verbs.
 const localPlaces = [
-  ['in', 'der', 'Schrank'], ['in', 'das', 'Zimmer'], ['in', 'die', 'Küche'],
-  ['auf', 'der', 'Tisch'], ['auf', 'das', 'Sofa'], ['auf', 'die', 'Bank'],
-  ['unter', 'der', 'Tisch'], ['unter', 'das', 'Bett'], ['unter', 'die', 'Bank'],
-  ['neben', 'der', 'Schrank'], ['neben', 'das', 'Fenster'], ['neben', 'die', 'Tür'],
-  ['vor', 'das', 'Haus'], ['hinter', 'die', 'Tür'], ['über', 'der', 'Tisch'], ['an', 'die', 'Wand'],
-  ['vor', 'der', 'Schrank'], ['hinter', 'das', 'Sofa'],
-  ['zwischen', 'der', 'Stuhl', ' und dem Tisch', ' und den Tisch'],
-  ['zwischen', 'das', 'Fenster', ' und der Tür', ' und die Tür'],
+  ['in', 'der', 'Schrank', 'Die Jacke hängt', 'Ich hänge den Mantel'],
+  ['in', 'das', 'Zimmer', 'Das Kind spielt', 'Wir tragen den Tisch'],
+  ['in', 'die', 'Küche', 'Mama kocht', 'Paul bringt die Einkäufe'],
+  ['auf', 'der', 'Tisch', 'Die Vase steht', 'Ich lege das Handy'],
+  ['auf', 'das', 'Sofa', 'Die Katze schläft', 'Lena legt das Kissen'],
+  ['auf', 'die', 'Bank', 'Opa sitzt', 'Ich lege die Tasche'],
+  ['unter', 'der', 'Tisch', 'Der Hund liegt', 'Das Kind legt den Ball'],
+  ['unter', 'das', 'Bett', 'Der Koffer liegt', 'Ich stelle die Schuhe'],
+  ['unter', 'die', 'Bank', 'Der Rucksack liegt', 'Anna stellt die Flasche'],
+  ['neben', 'der', 'Schrank', 'Der Stuhl steht', 'Wir stellen die Lampe'],
+  ['neben', 'das', 'Fenster', 'Das Bild hängt', 'Ich hänge den Kalender'],
+  ['neben', 'die', 'Tür', 'Der Regenschirm steht', 'Papa stellt das Fahrrad'],
+  ['vor', 'das', 'Haus', 'Das Auto steht', 'Die Kinder stellen die Fahrräder'],
+  ['hinter', 'die', 'Tür', 'Der Besen steht', 'Ich hänge die Jacke'],
+  ['über', 'der', 'Tisch', 'Die Lampe hängt', 'Wir hängen die Lampe'],
+  ['an', 'die', 'Wand', 'Das Foto hängt', 'Anna hängt die Uhr'],
+  ['vor', 'der', 'Schrank', 'Der Teppich liegt', 'Ich stelle den Koffer'],
+  ['hinter', 'das', 'Sofa', 'Das Spielzeug liegt', 'Tom legt die Zeitung'],
+  ['zwischen', 'der', 'Stuhl', 'Die Tasche steht', 'Ich stelle die Pflanze', ' und dem Tisch', ' und den Tisch'],
+  ['zwischen', 'das', 'Fenster', 'Das Regal steht', 'Wir stellen das Sofa', ' und der Tür', ' und die Tür'],
 ];
 const localMeanings = { in: 'inside', auf: 'on top of', unter: 'under', neben: 'next to', vor: 'in front of', hinter: 'behind', über: 'above', an: 'at / against the vertical surface of', zwischen: 'between' };
 
@@ -105,20 +135,23 @@ const banks = {
     const wrong = [noun, `${noun}e`, `${noun}en`, `${noun}s`, `${noun}er`];
     return [q(`Choose the plural of “${singular}”.`, plural, wrong), q(`Ich sehe zwei ___. (${singular})`, plural, wrong)];
   }),
-  indefinite: nouns.flatMap(([article, noun]) => ['Das ist', 'Hier ist', 'Dort ist', 'Ich sehe'].map((frame, i) => {
+  // Frames rotate across nouns; the last of each group is an accusative object.
+  indefinite: nouns.flatMap(([article, noun], n) => [0, 1, 2, 3].map(i => {
+    const frame = i === 3 ? indefiniteObjectFrames[n % indefiniteObjectFrames.length] : indefiniteSubjectFrames[(n * 3 + i) % indefiniteSubjectFrames.length];
     const answer = article === 'die' ? 'eine' : article === 'der' && i === 3 ? 'einen' : 'ein';
     return q(`${frame} ___ ${noun}. (a / an)`, answer, indefinite);
   })),
   personal: personalReferences.flatMap(([reference, pronoun, verb]) => personalPlaces.map(place =>
     q(`Use a subject pronoun for “${reference}”: ___ ${verb} ${place}.`, pronoun, ['ich', 'du', 'er', 'sie', 'es', 'wir', 'ihr']))),
-  possessive: nouns.slice(0, 5).flatMap(([article, noun]) => owners.flatMap(owner => {
+  possessive: owners.flatMap((owner, o) => [0, 1, 2, 3, 4].flatMap(k => {
+    const n = o * 5 + k, [article, noun] = possessiveNouns[n % possessiveNouns.length];
     const inflectedStem = owner.stem === 'euer' ? 'eur' : owner.stem;
     const beforeNoun = article === 'die' ? `${inflectedStem}e` : owner.stem;
     const standalone = article === 'der' ? `${inflectedStem}er` : article === 'die' ? `${inflectedStem}e` : owner.neuter;
     const forms = [owner.stem, `${inflectedStem}e`, `${inflectedStem}er`, `${inflectedStem}en`, `${inflectedStem}em`, owner.neuter];
     return [
-      q(`Das ist ___ ${noun}. (${owner.article})`, beforeNoun, forms),
-      q(`Wem gehört ${article} ${noun}? — Das ist ___. (${owner.pronoun})`, standalone, forms),
+      q(`${possessiveFrames[n % possessiveFrames.length].replace('{noun}', noun)} (${owner.article})`, beforeNoun, forms),
+      q(`${ownerQuestions[n % ownerQuestions.length].replace('{article}', article).replace('{noun}', noun)} (${owner.pronoun})`, standalone, forms),
     ];
   })),
   nominative: nouns.flatMap(([article, noun]) => {
@@ -130,16 +163,17 @@ const banks = {
       q(`Das ist ___ ${noun}. (the; after sein)`, article, definite),
     ];
   }),
-  demonstrative: nouns.flatMap(([article, noun]) => {
+  demonstrative: nouns.flatMap(([article, noun], n) => {
     const nom = { der: 'dieser', die: 'diese', das: 'dieses' }[article];
     const acc = { der: 'diesen', die: 'diese', das: 'dieses' }[article];
     const dat = article === 'die' ? 'dieser' : 'diesem';
     const which = { der: 'Welchen', die: 'Welche', das: 'Welches' }[article];
+    const [askVerb, answerVerb] = demoWhich[n % demoWhich.length], objectFrame = demoObject[n % demoObject.length];
     return [
-      q(`___ ${noun} ist hier. (this; subject)`, nom[0].toUpperCase() + nom.slice(1), demonstratives),
-      q(`Ich sehe ___ ${noun}. (this)`, acc, demonstratives),
-      q(`Ich stehe bei ___ ${noun}. (this)`, dat, demonstratives),
-      q(`${which} ${noun} meinst du? — Ich meine ___. (this one)`, acc, demonstratives),
+      q(`___ ${noun} ${demoSubject[n % demoSubject.length]}. (this; subject)`, nom[0].toUpperCase() + nom.slice(1), demonstratives),
+      q(`${objectFrame} ___ ${noun}${objectFrame.endsWith('du') ? '?' : '.'} (this)`, acc, demonstratives),
+      q(`${demoDative[n % demoDative.length].replace('{noun}', noun)} (this)`, dat, demonstratives),
+      q(`${which} ${noun} ${askVerb} du? — Ich ${answerVerb} ___. (this one)`, acc, demonstratives),
     ];
   }),
   prepositions: prepositionContexts.flatMap(([sentence, answer, hint], index) => names.map(name => {
@@ -147,16 +181,16 @@ const banks = {
     const others = ['mit', 'ohne', 'für', 'durch', 'gegen', 'um', 'aus', 'bei', 'nach', 'zu', 'von', 'seit', 'bis', 'ab', 'am', 'im', 'vor', 'in'].filter(value => value !== answer);
     return q(`${name} ${sentence} (${hint})`, answer, [0, 1, 2].map(k => others[(index * 3 + k * 5) % others.length]));
   })),
-  local: localPlaces.flatMap(([prep, article, noun, datTail = '', accTail = '']) => {
+  local: localPlaces.flatMap(([prep, article, noun, where, whereTo, datTail = '', accTail = '']) => {
     const dat = article === 'die' ? 'der' : 'dem';
     const acc = article === 'der' ? 'den' : article;
     const hint = localMeanings[prep];
     const options = Object.keys(localMeanings).filter(value => value !== prep).slice(0, 3);
     return [
-      q(`Die Lampe ist ${prep} ___ ${noun}${datTail}. (Wo?)`, dat, definite),
-      q(`Ich stelle die Lampe ${prep} ___ ${noun}${accTail}. (Wohin? New position.)`, acc, definite),
-      q(`Die Lampe ist ___ ${dat} ${noun}${datTail}. (${hint}; location)`, prep, options),
-      q(`Ich stelle die Lampe ___ ${acc} ${noun}${accTail}. (${hint}; destination)`, prep, options),
+      q(`${where} ${prep} ___ ${noun}${datTail}. (Wo?)`, dat, definite),
+      q(`${whereTo} ${prep} ___ ${noun}${accTail}. (Wohin? New position.)`, acc, definite),
+      q(`${where} ___ ${dat} ${noun}${datTail}. (${hint}; location)`, prep, options),
+      q(`${whereTo} ___ ${acc} ${noun}${accTail}. (${hint}; destination)`, prep, options),
     ];
   }),
   wquestions: wQuestions.flatMap(([prompt, answer, choices]) => names.map(name => q(prompt.replaceAll('{name}', name), answer, choices))),
