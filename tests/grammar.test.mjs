@@ -7,8 +7,8 @@ import { upgradeProgress } from '../public/levels.js';
 
 test('every grammar rule has its configured number of distinct exercises with one answer option', () => {
   assert.deepEqual(RULES.map(rule => rule.id), RULE_IDS);
-  assert.equal(RULES.length, 24);
-  assert.equal(RULES.reduce((count, rule) => count + rule.qs.length, 0), 1500);
+  assert.equal(RULES.length, 25);
+  assert.equal(RULES.reduce((count, rule) => count + rule.qs.length, 0), 1548);
   for (const rule of RULES) {
     assert.equal(rule.qs.length, ruleTarget(rule.id).size, rule.id);
     assert.equal(new Set(rule.qs.map(([prompt]) => prompt)).size, ruleTarget(rule.id).size, rule.id);
@@ -26,6 +26,25 @@ test('every grammar rule has its configured number of distinct exercises with on
   assert.ok(RULES.find(rule => rule.id === 'perfect').qs.some(([prompt, answer]) => prompt.includes('nach Berlin gefahren') && answer === 'bin'));
   assert.ok(RULES.find(rule => rule.id === 'dative').qs.some(([prompt, answer]) => prompt.includes('mit ___ Frau') && answer === 'der'));
   assert.ok(RULES.find(rule => rule.id === 'dative').qs.some(([prompt, answer]) => prompt.includes('helfe ___ Kind') && answer === 'dem'));
+});
+
+test('imperatives distinguish du, ihr and Sie and preserve irregular and separable forms', () => {
+  const rule = RULES.find(rule => rule.id === 'imperativ');
+  assert.ok(rule, 'Der Imperativ is available for practice');
+  assert.equal(rule.level, 'A1');
+  for (const [cue, answer] of [
+    ['du, short form; machen', 'Mach'], ['ihr; machen', 'Macht'], ['Sie; machen', 'Machen'],
+    ['du; warten', 'Warte'], ['du; lesen', 'Lies'], ['du; nehmen', 'Nimm'],
+    ['du, short form; fahren', 'Fahr'], ['du; sein', 'Sei'], ['ihr; sein', 'Seid'], ['Sie; sein', 'Seien'],
+    ['du, short form; aufstehen', 'Steh'],
+  ]) {
+    const question = rule.qs.find(([prompt]) => prompt.includes(`(${cue})`));
+    assert.ok(question, cue);
+    assert.equal(question[1], answer, cue);
+  }
+  assert.ok(rule.qs.some(([prompt]) => prompt.includes(' auf!')));
+  assert.ok(rule.qs.some(([prompt]) => prompt.includes('nicht')));
+  assert.ok(rule.qs.some(([prompt]) => prompt.includes('bitte')));
 });
 
 test('new topics cover plural patterns, pronoun roles and case-sensitive endings', () => {

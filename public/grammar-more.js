@@ -124,7 +124,33 @@ const gaps = (verb, end = '—') => `${verb} … ${end}`;
 const separated = (subject, context, infinitive, prefix, form) =>
   q(`${subject} ___ ${context} ___. (${infinitive})`, gaps(form, prefix), [gaps(`${prefix}${form}`), gaps('—', `${prefix}${form}`), gaps(form)]);
 
+// Explicit forms keep irregular verbs and separable prefixes unambiguous.
+// [infinitive, du, ihr, Sie, sentence ending, short du form]
+const imperativeVerbs = [
+  ['machen', 'Mach', 'Macht', 'Machen', 'bitte die Hausaufgaben', true],
+  ['kommen', 'Komm', 'Kommt', 'Kommen', 'bitte morgen', true],
+  ['gehen', 'Geh', 'Geht', 'Gehen', 'nicht so schnell', true],
+  ['lernen', 'Lern', 'Lernt', 'Lernen', 'jeden Tag Deutsch', true],
+  ['warten', 'Warte', 'Wartet', 'Warten', 'bitte hier', false],
+  ['arbeiten', 'Arbeite', 'Arbeitet', 'Arbeiten', 'nicht zu lange', false],
+  ['öffnen', 'Öffne', 'Öffnet', 'Öffnen', 'bitte das Fenster', false],
+  ['lesen', 'Lies', 'Lest', 'Lesen', 'bitte den Text', false],
+  ['nehmen', 'Nimm', 'Nehmt', 'Nehmen', 'bitte das Buch', false],
+  ['sprechen', 'Sprich', 'Sprecht', 'Sprechen', 'bitte langsam', false],
+  ['helfen', 'Hilf', 'Helft', 'Helfen', 'bitte dem Kind', false],
+  ['fahren', 'Fahr', 'Fahrt', 'Fahren', 'bitte vorsichtig', true],
+  ['schlafen', 'Schlaf', 'Schlaft', 'Schlafen', 'gut', true],
+  ['sein', 'Sei', 'Seid', 'Seien', 'bitte leise', false],
+  ['aufstehen', 'Steh', 'Steht', 'Stehen', 'bitte früh auf', true],
+  ['anrufen', 'Ruf', 'Ruft', 'Rufen', 'bitte Anna an', true],
+];
+
 const banks = {
+  imperativ: imperativeVerbs.flatMap(([infinitive, du, ihr, formal, ending, short]) => [
+    q(`___ ${ending}! (du${short ? ', short form' : ''}; ${infinitive})`, du, [ihr, formal, `${du}st`]),
+    q(`___ ${ending}! (ihr; ${infinitive})`, ihr, [du, formal, `${ihr}en`]),
+    q(`___ Sie ${ending}! (Sie; ${infinitive})`, formal, [du, ihr, `${formal}t`]),
+  ]),
   localadverbs: localAdverbs.map(([prompt, answer, choices]) => q(prompt, answer, choices)),
   // Each verb gets four exercises; verbs alternate between two sets of subjects and clause types.
   separable: separableVerbs.flatMap(([infinitive, prefix, ich, du, context, meaning], i) => {
@@ -182,9 +208,17 @@ export const MORE_RULES = [
   { id: 'reflexive', level: 'A2', title: 'Reflexive Verben', desc: 'mich, dich, sich, uns, euch; mir and dir', tip: 'Match the reflexive pronoun to the subject. With a separate accusative object such as die Hände, use dative mir / dir.' },
   { id: 'participle', level: 'A2', title: 'Partizip II — Partizip Perfekt', desc: 'Regular, irregular, prefixed and -ieren verbs', tip: 'Learn irregular participles. Separable prefixes place ge in the middle; inseparable prefixes and -ieren verbs normally have no ge.' },
   { id: 'countable', level: 'A1', title: 'Zählbare & unzählbare Nomen', desc: 'viele Bücher, viel Wasser', tip: 'Count individual objects with numbers and viele. For substances as a whole, use viel or a measure such as ein Glas Wasser.' },
+  { id: 'imperativ', level: 'A1', title: 'Der Imperativ', desc: 'Requests, instructions and advice with du, ihr and Sie', tip: 'Start with the verb. Omit du and ihr; keep Sie after the verb. Separable prefixes go at the end.' },
 ].map(rule => ({ ...rule, qs: banks[rule.id] }));
 
 export const MORE_THEORY = {
+  imperativ: {
+    explanation: 'Use the imperative to give instructions, advice or requests. The verb comes first. For one familiar person, use the du imperative without du; for several familiar people, use the present-tense ihr form without ihr. For formal requests, use the infinitive-shaped verb followed by Sie. Bitte makes a request more polite; nicht makes it negative.',
+    headers: ['Verb', 'du', 'ihr', 'Sie'],
+    rows: [['machen', 'Mach! / Mache!', 'Macht!', 'Machen Sie!'], ['warten', 'Warte!', 'Wartet!', 'Warten Sie!'], ['lesen', 'Lies!', 'Lest!', 'Lesen Sie!'], ['nehmen', 'Nimm!', 'Nehmt!', 'Nehmen Sie!'], ['fahren', 'Fahr! / Fahre!', 'Fahrt!', 'Fahren Sie!'], ['sein', 'Sei!', 'Seid!', 'Seien Sie!'], ['aufstehen', 'Steh auf! / Stehe auf!', 'Steht auf!', 'Stehen Sie auf!']],
+    examples: [['Öffne bitte das Fenster!', 'Please open the window. (du)'], ['Lest bitte den Text!', 'Please read the text. (ihr)'], ['Seien Sie bitte leise!', 'Please be quiet. (formal)'], ['Ruf bitte Anna an!', 'Please call Anna. (du, short form)'], ['Fahr nicht so schnell!', 'Do not drive so fast. (du, short form)']],
+    note: 'Many du forms allow an optional -e: mach / mache. These exercises explicitly ask for the short form when needed. Keep e → i/ie changes (nimm, sprich, lies), but omit the a → ä umlaut (fahr, schlaf). Never add -e to nimm or lies. Stems such as wart-, arbeit- and öffn- need -e in the du form. Learn sei / seid / seien Sie as special forms.',
+  },
   localadverbs: {
     explanation: 'Local adverbs describe a place or direction without needing a following noun phrase. Compare dort (there) with dorthin (to there). The perspective of the speaker matters for her- and hin-.',
     headers: ['Use', 'Examples'], rows: [['Position', 'hier, dort, drinnen, draußen, oben, unten'], ['Destination', 'hierher, dorthin, hinein, hinaus'], ['Toward the speaker', 'herein, heraus, herauf, herunter'], ['Away from the speaker', 'hinein, hinaus, hinauf, hinunter'], ['Orientation', 'links, rechts, vorn, hinten, geradeaus'], ['Unspecified / absent location', 'irgendwo / nirgendwo']],

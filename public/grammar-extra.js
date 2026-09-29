@@ -527,4 +527,18 @@ export const EXTRA_BANKS = {
   sein, present, articles, accusative, modal, wordorder, perfect, dative, because, comparative,
   plural, indefinite: indefinite_, personal, possessive, nominative, demonstrative, prepositions,
   local, wquestions, localadverbs, separable, reflexive, participle, countable,
+  imperativ: [
+    q('___ bitte genug Wasser! (du, short form; trinken)', 'Trink', ['Trinkt', 'Trinken', 'Trinkst']),
+    q('___ bitte genug Wasser! (ihr; trinken)', 'Trinkt', ['Trink', 'Trinken', 'Trinkst']),
+    q('___ Sie bitte genug Wasser! (Sie; trinken)', 'Trinken', ['Trink', 'Trinkt', 'Trinkst']),
+    q('___ bitte einen Apfel! (du; essen)', 'Iss', ['Esst', 'Essen', 'Isst']),
+    q('___ bitte einen Apfel! (ihr; essen)', 'Esst', ['Iss', 'Essen', 'Isst']),
+    q('___ Sie bitte einen Apfel! (Sie; essen)', 'Essen', ['Iss', 'Esst', 'Isst']),
+    q('___ bitte dem Kind das Buch! (du; geben)', 'Gib', ['Gebt', 'Geben', 'Gibst']),
+    q('___ bitte dem Kind das Buch! (ihr; geben)', 'Gebt', ['Gib', 'Geben', 'Gibst']),
+    q('___ Sie bitte dem Kind das Buch! (Sie; geben)', 'Geben', ['Gib', 'Gebt', 'Gibst']),
+    q('___ bitte gut zu! (du, short form; zuhören)', 'Hör', ['Hört', 'Hören', 'Hörst']),
+    q('___ bitte gut zu! (ihr; zuhören)', 'Hört', ['Hör', 'Hören', 'Hörst']),
+    q('___ Sie bitte gut zu! (Sie; zuhören)', 'Hören', ['Hör', 'Hört', 'Hörst']),
+  ],
 };

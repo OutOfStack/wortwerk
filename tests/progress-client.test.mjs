@@ -354,7 +354,7 @@ test('grammar resumes immediately after the saved answer, including a reload bef
   await settle();
   reloaded.evaluate("startRule('sein')");
   assert.equal(reloaded.evaluate('session.index'), 1);
-  assert.match(reloaded.elements.get('#content').innerHTML, /This set: 0 correct · 0 answered[\s\S]*Topic: 1 correct · 1 answered · 32 in a round/);
+  assert.match(reloaded.elements.get('#content').innerHTML, /aria-label="1 correct, 0 incorrect, 31 not answered/);
   reloaded.evaluate("answer('wrong')");
   const accountProgress = JSON.parse(reloaded.storage.get('wortwerk-guest-progress'));
   const accountApp = boot(async path => response(path === '/api/auth/me' ? { user } : { userId: user.id, progress: accountProgress, revision: 4 }));
@@ -364,7 +364,7 @@ test('grammar resumes immediately after the saved answer, including a reload bef
   assert.equal(accountApp.evaluate("ruleStatus('sein').correct"), 1);
 });
 
-test('every grammar topic renders its exercise, theory and saved score', async () => {
+test('every grammar topic renders its exercise, theory and visual progress', async () => {
   const app = boot(async () => response({ user: null }));
   await settle();
   for (const rule of RULES) {
@@ -372,12 +372,12 @@ test('every grammar topic renders its exercise, theory and saved score', async (
     const html = app.elements.get('#content').innerHTML;
     assert.ok(html.includes(`1/${Math.min(10, rule.qs.length)}</strong>`), rule.id);
     assert.ok(html.includes('Theory &amp; examples'), rule.id);
-    assert.ok(html.includes(`Pass with ${Math.ceil(rule.qs.length * 7 / 8)} correct in a full round`), rule.id);
-    assert.ok(html.includes('Topic: no answers yet'), rule.id);
-    assert.doesNotMatch(html, /answers recorded|Keys 1/, rule.id);
+    assert.ok(html.includes('class="grammar-pass"'), rule.id);
+    assert.ok(html.includes('class="grammar-unanswered" style="width:100%"'), rule.id);
+    assert.doesNotMatch(html, /Topic:|This set:|Pass with|Round \d|answers recorded|Keys 1/, rule.id);
   }
   app.evaluate('renderGrammar()');
-  assert.equal((app.elements.get('#content').innerHTML.match(/<article class="rule">/g) || []).length, 24);
+  assert.equal((app.elements.get('#content').innerHTML.match(/<article class="rule">/g) || []).length, RULES.filter(rule => rule.level === 'A1').length);
 });
 
 test('a grammar visit ends after a set of 10 and the next visit continues in place', async () => {
@@ -392,6 +392,8 @@ test('a grammar visit ends after a set of 10 and the next visit continues in pla
   const html = app.elements.get('#content').innerHTML;
   assert.match(html, /Set complete\./);
   assert.match(html, /<strong>9\/10<\/strong><small>correct this set/);
+  assert.match(html, /9 correct · 10 answered · 80 in a round/);
+  assert.match(html, /Pass with 70 correct in a full round/);
   assert.match(html, /Practise 1 mistake again/);
   assert.equal(app.evaluate("ruleStatus('present').attempts"), 10);
   app.elements.get('#again').onclick();
@@ -433,7 +435,7 @@ test('shorter cycles carry their score and can pass on the first answer of a lat
   assert.equal(app.elements.get('#totalMastery').textContent, '1 grammar rules passed');
   app.evaluate('renderGrammar()');
   assert.match(app.elements.get('#content').innerHTML, /<article class="rule passed"><div><span class="eyebrow">A1 · <span class="passed-badge">✓ Passed<\/span>/);
-  assert.match(app.elements.get('#content').innerHTML, /28 correct · 32 answered · 32 in a round[\s\S]*Passed · counts your latest 32 answers/);
+  assert.match(app.elements.get('#content').innerHTML, /aria-label="28 correct, 4 incorrect, 0 not answered/);
   assert.equal(app.evaluate('nextRule().id'), 'present');
 });
 
@@ -500,7 +502,8 @@ test('later grammar rounds draw a stable mix from the larger bank', async () => 
   assert.equal(app.evaluate('session.index'), 0);
   const first = app.evaluate('JSON.stringify(session.items.map(q=>q[0]))');
   assert.notEqual(first, JSON.stringify(RULES[0].qs.map(q => q[0])));
-  assert.match(app.elements.get('#content').innerHTML, /sein — to be · Round 2</);
+  assert.match(app.elements.get('#content').innerHTML, /sein — to be</);
+  assert.doesNotMatch(app.elements.get('#content').innerHTML, /Round 2/);
   app.evaluate("startRule('sein')");
   assert.equal(app.evaluate('JSON.stringify(session.items.map(q=>q[0]))'), first, 'a reload resumes the same round');
   app.evaluate("answer('wrong')");
@@ -647,23 +650,44 @@ test('guided rounds balance revisits and new words, exclude complete words, and 
   assert.equal(app.evaluate('session.type'), 'grammar', 'a finished vocabulary pool has a useful next action');
 });
 
-test('grammar scores show counts: correct, answered and round size, without percentages', async () => {
+test('grammar bars update correct, incorrect and unanswered portions without visible counters', async () => {
   const app = boot(async () => response({ user: null }), empty());
   await settle();
   app.evaluate("startRule('sein')");
-  assert.match(app.elements.get('#content').innerHTML, /Topic: no answers yet/);
+  assert.match(app.elements.get('#content').innerHTML, /aria-label="0 correct, 0 incorrect, 32 not answered/);
   app.evaluate('answer(session.current.answer)');
-  const score = app.elements.get('#grammarScore').innerHTML;
-  assert.match(score, /This set: 1 correct · 1 answered/);
+  const score = app.elements.get('#grammarProgress').innerHTML;
+  assert.match(score, /class="grammar-correct" style="width:3.125%"/);
+  assert.match(score, /class="grammar-unanswered" style="width:96.875%"/);
+  assert.match(score, /class="grammar-pass" style="left:87.5%"/);
   assert.match(app.evaluate("ruleScore(ruleStatus('sein'))"), /^1 correct · 1 answered · 32 in a round/);
-  assert.match(score, /Topic: 1 correct · 1 answered · 32 in a round · Pass with 28 correct in a full round/);
-  assert.doesNotMatch(score, /%|Passed/);
+  assert.doesNotMatch(score, /Topic:|This set:|Pass with/);
   app.elements.get('#next').onclick();
   app.evaluate("answer('wrong')");
-  assert.match(app.elements.get('#grammarScore').innerHTML, /This set: 1 correct · 2 answered/);
+  assert.match(app.elements.get('#grammarProgress').innerHTML, /aria-label="1 correct, 1 incorrect, 30 not answered/);
+  assert.match(app.elements.get('#grammarProgress').innerHTML, /class="grammar-incorrect" style="width:3.125%"/);
+  assert.match(app.elements.get('#grammarProgress').innerHTML, /class="grammar-unanswered" style="width:93.75%"/);
   app.evaluate("state.grammarProgress.sein={answers:Array(32).fill(false),attempts:64,passed:true};renderGrammar()");
-  assert.match(app.elements.get('#content').innerHTML, /0 correct · 32 answered · 32 in a round/);
-  assert.match(app.elements.get('#content').innerHTML, /Passed · counts your latest 32 answers/);
+  assert.match(app.elements.get('#content').innerHTML, /aria-label="0 correct, 32 incorrect, 0 not answered/);
+  assert.match(app.elements.get('#content').innerHTML, /✓ Passed/);
+  assert.doesNotMatch(app.elements.get('#content').innerHTML, /Next: exercise|\d+ correct ·|Start rule|Continue rule|Practise again/);
+  app.evaluate("startRule('sein');answer(session.current.answer)");
+  assert.match(app.elements.get('#grammarProgress').innerHTML, /aria-label="1 correct, 31 incorrect, 0 not answered/);
+});
+
+test('grammar gym shows only the selected level and keeps passed topics last', async () => {
+  const app = boot(async () => response({ user: null }), empty());
+  await settle();
+  app.evaluate("state.grammarProgress.sein={answers:Array(32).fill(true),attempts:32,passed:true};renderGrammar()");
+  const html = app.elements.get('#content').innerHTML;
+  assert.doesNotMatch(html, /All rules|data-level="all"|data-rule="perfect"/);
+  assert.match(html, /filter active" data-level="A1"/);
+  const ids = [...html.matchAll(/data-rule="([^"]+)"/g)].map(match => match[1]);
+  assert.deepEqual(ids, [...RULES.filter(rule => rule.level === 'A1' && rule.id !== 'sein').map(rule => rule.id), 'sein']);
+  assert.match(html, /<button class="rule-start"[^>]*data-rule="imperativ"[^>]*aria-label="Start Der Imperativ"/);
+  app.evaluate("renderGrammar('A2')");
+  assert.doesNotMatch(app.elements.get('#content').innerHTML, /data-rule="sein"|data-rule="imperativ"/);
+  assert.match(app.elements.get('#content').innerHTML, /filter active" data-level="A2"/);
 });
 
 test('word retries contain only missed words and narrow to remaining mistakes', async () => {
@@ -709,12 +733,14 @@ test('grammar retries preserve the assessment and saved position while awarding 
   assert.match(app.elements.get('#content').innerHTML, /Practise 5 mistakes again/);
   app.elements.get('#retryMistakes').onclick();
   assert.equal(app.evaluate('session.items.length'), 5);
+  const assessmentBar = app.elements.get('#content').innerHTML.match(/<div id="grammarProgress"[^>]*>(.*?)<\/div>\s*<div class="input-toggle"/s)?.[1];
   assert.equal(app.evaluate('session.items.every((q,i)=>q===RULES[0].qs[i])'), true);
   for (let i=0;i<5;i++) {
     app.evaluate(i===0?"answer('wrong')":'answer(session.current.answer)');
     app.elements.get('#next').onclick();
   }
   assert.equal(JSON.stringify(app.evaluate('state.grammarProgress.sein')), before);
+  assert.equal(app.elements.get('#grammarProgress').innerHTML, assessmentBar, 'retries do not move the topic assessment bar');
   app.elements.get('#retryMistakes').onclick();
   assert.equal(app.evaluate('session.items.length'), 1);
   app.evaluate('answer(session.current.answer);answer(session.current.answer)');

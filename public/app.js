@@ -131,6 +131,7 @@ function updateChrome(){
  ring.setAttribute('aria-label',`Level ${rank.level}: ${rank.title}. ${rank.maxed?'Top level reached.':`${rank.remaining} XP to level ${rank.level+1}.`}`);
  $('#totalMastery').textContent=mastered+' grammar rules passed';
  $('#streakCount').textContent=currentStreak();
+ $('#streakUnit').textContent=currentStreak()===1?'day':'days';
  updateSoundButton();
 }
 function rankOverview(){
@@ -190,6 +191,10 @@ function ruleCompletion(progress){
 function ruleScore(progress){
  return `${progress.answered?ruleCounts(progress):'No answers yet'}<span class="grammar-detail">${ruleCompletion(progress)}</span>`;
 }
+function grammarBar({correct,answered,size,target,passed}){
+ const incorrect=answered-correct,unanswered=size-answered;
+ return `<div class="grammar-meter" role="img" aria-label="${correct} correct, ${incorrect} incorrect, ${unanswered} not answered. Pass requires ${target} correct and a full ${size}-answer window.${passed?' Already passed.':''}"><div class="grammar-track" aria-hidden="true"><span class="grammar-correct" style="width:${correct/size*100}%"></span><span class="grammar-incorrect" style="width:${incorrect/size*100}%"></span><span class="grammar-unanswered" style="width:${unanswered/size*100}%"></span><span class="grammar-pass" style="left:${target/size*100}%">Pass</span></div></div>`;
+}
 function nextRule(){return RULES.find(r=>!ruleStatus(r.id).passed)||RULES[0]}
 function renderWords(level='all'){const list=level==='all'?WORDS:WORDS.filter(w=>w.level===level);content.innerHTML=`<section class="page"><span class="eyebrow">Vocabulary</span><h1>Words in motion.</h1><p class="intro">Each word leaves practice after 8 correct answers. Already know one? Choose “I know this”.</p><div class="word-search"><label for="wordQuery">Find a word</label><input id="wordQuery" type="search" placeholder="German or English, e.g. Käse or cheese" autocomplete="off" spellcheck="false"><div id="wordResults" aria-live="polite"></div></div><div class="filters">${['all','A1','A2'].map(x=>`<button class="filter ${x===level?'active':''}" data-level="${x}">${x==='all'?'All levels':x}</button>`).join('')}</div><div class="section-head word-section"><div><h2>${list.length-pendingWords(list).length}/${list.length} words complete</h2><p>Learned through practice or marked known · Colours show gender: <span class="g-der">der</span> · <span class="g-die">die</span> · <span class="g-das">das</span></p></div><button class="primary" data-start="words" data-word-level="${level}">Start mixed practice</button></div><div class="lesson-grid">${Object.entries(groupBy(list,'topic')).map(([topic,arr])=>{const done=arr.length-pendingWords(arr).length;return `<button class="lesson-card" data-topic="${topic}"><span class="lesson-icon">${topic.slice(0,1)}</span><span><h3>${topic}</h3><p>${done}/${arr.length} complete · ${[...new Set(arr.map(x=>x.level))].join(' / ')}</p><span class="bar topic-bar" aria-hidden="true"><span style="width:${done/arr.length*100}%"></span></span></span><span class="score">→</span></button>`}).join('')}</div></section>`;document.querySelectorAll('[data-level]').forEach(b=>b.onclick=()=>renderWords(b.dataset.level));bindLessonButtons();document.querySelectorAll('[data-topic]').forEach(b=>b.onclick=()=>startWords(list.filter(w=>w.topic===b.dataset.topic)));$('#wordQuery').oninput=event=>renderWordResults(event.target.value)}
 // Searching ignores articles, case and umlaut spelling, like typed answers do.
@@ -204,11 +209,11 @@ function renderWordResults(query){
  document.querySelectorAll('[data-restore-search]').forEach(b=>b.onclick=()=>{state.knownWordIds=(state.knownWordIds||[]).filter(known=>known!==b.dataset.restoreSearch);save();renderWordResults(query)});
 }
 function groupBy(a,k){return a.reduce((o,x)=>((o[x[k]]??=[]).push(x),o),{})}
-function renderGrammar(level='all'){
- const list=level==='all'?RULES:RULES.filter(r=>r.level===level);
- content.innerHTML=`<section class="page"><span class="eyebrow">Grammar gym</span><h1>Repeat until it sticks.</h1><p class="intro">Choose a topic and practise at your own pace. Your place is saved after every answer.</p><div class="filters">${['all','A1','A2'].map(x=>`<button class="filter ${x===level?'active':''}" data-level="${x}">${x==='all'?'All rules':x}</button>`).join('')}</div><div class="rule-list">${list.map(r=>{
+function renderGrammar(level='A1'){
+ const list=RULES.filter(r=>r.level===level).sort((a,b)=>Number(ruleStatus(a.id).passed)-Number(ruleStatus(b.id).passed));
+ content.innerHTML=`<section class="page"><span class="eyebrow">Grammar gym</span><h1>Repeat until it sticks.</h1><p class="intro">Choose a topic and practise at your own pace. Your place is saved after every answer.</p><div class="filters">${['A1','A2'].map(x=>`<button class="filter ${x===level?'active':''}" data-level="${x}">${x}</button>`).join('')}</div><div class="rule-list">${list.map(r=>{
   const progress=ruleStatus(r.id);
-  return `<article class="rule${progress.passed?' passed':''}"><div><span class="eyebrow">${r.level} · ${progress.passed?'<span class="passed-badge">✓ Passed</span>':progress.attempts?'In progress':'Not started'}</span><h3>${r.title}</h3><div class="meta">${r.desc}</div><p class="grammar-score">${ruleScore(progress)}</p><div class="bar" aria-hidden="true"><span style="width:${progress.answered/progress.size*100}%"></span></div><p class="meta">Next: exercise ${progress.next+1} of ${progress.size}</p></div><button class="${progress.attempts?'secondary':'primary'}" data-rule="${r.id}">${progress.passed?'Practise again':progress.attempts?'Continue rule':'Start rule'}</button>${ruleTheory(r)}</article>`;
+  return `<article class="rule${progress.passed?' passed':''}"><div><span class="eyebrow">${r.level} · ${progress.passed?'<span class="passed-badge">✓ Passed</span>':progress.attempts?'In progress':'Not started'}</span><h3>${r.title}</h3><div class="meta">${r.desc}</div>${grammarBar(progress)}</div><button class="rule-start" data-rule="${r.id}" aria-label="${progress.passed?'Practise':progress.attempts?'Continue':'Start'} ${esc(r.title)}"></button>${ruleTheory(r)}</article>`;
  }).join('')}</div></section>`;
  document.querySelectorAll('[data-level]').forEach(b=>b.onclick=()=>renderGrammar(b.dataset.level));bindLessonButtons();
 }
@@ -317,12 +322,6 @@ function startRule(id){
  session={type:'grammar',rule,cycle,items:exerciseDeck(rule,cycle),index:progress.next,limit:GRAMMAR_SET,roundCorrect:0,answered:0,missed:[],missedItems:[]};
  renderRuleQuestion();
 }
-function grammarScore(id){
- const answered=session.answered||0;
- const visit=`${session.retry?'Retry':'This set'}: ${session.roundCorrect} correct · ${answered} answered`;
- const progress=ruleStatus(id);
- return `${visit}<span class="grammar-detail">${session.retry?'Extra practice · your topic progress stays unchanged.':`Topic: ${progress.answered?ruleCounts(progress):'no answers yet'} · ${ruleCompletion(progress)}`}</span>`;
-}
 // Typing suits short answers; sentence-order and two-option questions stay multiple choice.
 function canType(q){return q[1].split(' ').length<=2&&q[2].length>=2}
 function grammarInput(){try{return localStorage.getItem('wortwerk-grammar-input')==='type'?'type':'choice'}catch{return 'choice'}}
@@ -333,7 +332,7 @@ function renderRuleQuestion(mode=grammarInput()){
  session.current={answer:q[1],prompt:q[0],kind:typed?'type':'choice'};
  const input=typed?`<form class="type-row" id="answerForm"><input id="typed" autocomplete="off" autocapitalize="off" spellcheck="false" lang="de" placeholder="Type the missing part…" aria-label="Your answer" aria-describedby="answerHint"><button class="primary">Check</button></form><p class="answer-hint" id="answerHint">ae, oe, ue and ss accepted</p>`:choiceButtons(shuffle([q[1],...q[2]]),'de');
  const toggle=`<div class="input-toggle" role="group" aria-label="Answer mode"><button class="filter ${mode==='type'?'':'active'}" data-input="choice" aria-pressed="${mode!=='type'}">Choose</button><button class="filter ${mode==='type'?'active':''}" data-input="type" aria-pressed="${mode==='type'}">Type</button>${mode==='type'&&!typed?'<span>This one is multiple choice.</span>':''}</div>`;
- practiceShell(`<div class="prompt-label">${session.retry?'Mistake retry · ':''}${esc(session.rule.title)}${session.cycle?` · Round ${session.cycle+1}`:''}</div><p class="grammar-score" id="grammarScore" role="status">${grammarScore(session.rule.id)}</p>${toggle}${promptBox(q[0],'de')}${q[0].split('___').length===3?'<p class="prompt-hint">Fill both gaps; — leaves a gap empty.</p>':''}${input}`,`<div class="mastery-note"><strong>Rule</strong> — ${esc(session.rule.tip)}</div>${ruleTheory(session.rule)}`);
+ practiceShell(`<div class="prompt-label">${session.retry?'Mistake retry · ':''}${esc(session.rule.title)}</div><div id="grammarProgress" role="status">${grammarBar(ruleStatus(session.rule.id))}</div>${toggle}${promptBox(q[0],'de')}${q[0].split('___').length===3?'<p class="prompt-hint">Fill both gaps; — leaves a gap empty.</p>':''}${input}`,`<div class="mastery-note"><strong>Rule</strong> — ${esc(session.rule.tip)}</div>${ruleTheory(session.rule)}`);
  document.querySelectorAll('[data-answer]').forEach(b=>b.onclick=()=>answer(b.dataset.answer,b));
  document.querySelectorAll('[data-input]').forEach(b=>b.onclick=()=>setGrammarInput(b.dataset.input));
  if(typed){$('#answerForm').onsubmit=e=>{e.preventDefault();answer($('#typed').value)};$('#typed').focus?.()}
@@ -442,7 +441,7 @@ function answer(value,button){
    session.justPassed=!wasPassed&&ruleStatus(id).passed;
   }
   session.answered=(session.answered||0)+1;
-  $('#grammarScore').innerHTML=grammarScore(id);
+  $('#grammarProgress').innerHTML=grammarBar(ruleStatus(id));
   if(!ok){
    const {prompt='',answer:correct}=session.current,completed=completedSentence(prompt,correct),spoken=grammarSpeech(prompt,correct);
    session.missed?.push(completed?`${completed} ${speakButton(spoken)}${translateButton(spoken)}`:`<span lang="de">${esc(prompt)}</span> → <strong lang="de">${esc(correct)}</strong>`);
@@ -503,7 +502,7 @@ async function loadAccount(){
         // Persist the upgrade through the normal save path so storage failures surface once.
         if(stored&&(stored.xpVersion!==XP_VERSION||stored.grammarVersion!==GRAMMAR_VERSION||stored.vocabularyVersion!==VOCABULARY_VERSION))save();
       }catch{state=structuredClone(defaultState)}
-      $('#account').innerHTML='<a class="sound-toggle" href="/sign-in">Sign in / Register</a>';
+      $('#account').innerHTML='<a class="sound-toggle" href="/sign-in">Sign in<span class="account-register"> / Register</span></a>';
     }
     ready=true;syncNotice('');updateChrome();go(currentView);
   }catch(error){content.innerHTML='<section class="page"><h2>Unable to load your progress</h2><p>Please try again before starting a practice round.</p><button id="retryLoad" class="primary">Retry</button></section>';$('#retryLoad').onclick=loadAccount;syncNotice(error.message)}

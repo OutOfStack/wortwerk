@@ -4,7 +4,7 @@ export const PREVIOUS_RULE_SIZES = {
   wordorder: 40, perfect: 40, dative: 40, because: 40, comparative: 40,
   plural: 40, indefinite: 40, personal: 20, possessive: 48, nominative: 32,
   demonstrative: 40, prepositions: 20, local: 40, wquestions: 20,
-  localadverbs: 24, separable: 40, reflexive: 40, participle: 40, countable: 32,
+  localadverbs: 24, separable: 40, reflexive: 40, participle: 40, countable: 32, imperativ: 48,
 };
 // Broader topics benefit from repetition across subjects, forms and contexts.
 export const RULE_SIZES = {
