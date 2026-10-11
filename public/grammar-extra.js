@@ -67,8 +67,22 @@ const present = [
   q('Wie lange ___ du schon Deutsch? (to learn)', 'lernst', ['lerne', 'lernt', 'lernen']),
 ];
 
-// Nouns beyond the first-cycle article drill, with the English meaning as a cue.
-const articles = WORDS.filter(word => word.pos === 'noun').slice(80).filter((_, i) => i % 4 === 1).map(word => {
+// Everyday nouns replace the A2 nouns of the first article cycle, slot for slot,
+// so unfinished first cycles resume at the same position.
+const COMMON_NOUNS = [
+  'der Mann', 'die Frau', 'das Kind', 'der Vater', 'die Mutter', 'das Auto', 'der Bus',
+  'der Zug', 'der Hund', 'die Katze', 'das Buch', 'die Uhr', 'der Tag', 'die Nacht',
+  'das Jahr', 'das Geld', 'die Hand', 'der Kopf', 'die Familie', 'der Freund',
+  'die Freundin', 'das Mädchen', 'der Junge', 'die Arbeit', 'der Lehrer', 'das Wetter',
+];
+const nouns = WORDS.filter(word => word.pos === 'noun');
+const commonNouns = COMMON_NOUNS.map(de => nouns.find(word => word.de === de));
+let nextCommon = 0;
+export const ARTICLE_NOUNS = nouns.slice(0, 80).map(word => word.level === 'A2' ? commonNouns[nextCommon++] : word);
+if (nextCommon !== COMMON_NOUNS.length || commonNouns.some(word => !word)) throw new Error('Article nouns must fill every A2 slot');
+
+// Every other common A1 noun, plus the earlier A2 selection, with the English meaning as a cue.
+const articles = nouns.slice(80).filter((word, i) => !ARTICLE_NOUNS.includes(word) && (word.level === 'A1' || i % 4 === 1)).map(word => {
   const [article, ...noun] = word.de.split(' ');
   return q(`___ ${noun.join(' ')} (the ${word.en})`, article, ['der', 'die', 'das', 'den']);
 });

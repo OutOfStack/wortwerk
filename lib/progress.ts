@@ -49,6 +49,8 @@ const progressFields = z.object({
   grammarProgress: grammarProgress.optional(),
   streak: counter, sound: z.boolean(), activity: z.array(counter).length(7),
   activityLog: activityLog.optional(),
+  // The last missed day forgiven for the streak (YYYY-MM-DD).
+  streakFreezeDay: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 }).strict();
 // Old stored progress is upgraded on read and persisted with its next save.
 export const progressSchema = progressFields.refine(consistent).transform(upgradeProgress);

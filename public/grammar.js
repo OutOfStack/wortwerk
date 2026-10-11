@@ -1,7 +1,6 @@
-import { WORDS } from './vocabulary.js';
 import { EXTRA_RULES } from './grammar-topics.js';
 import { MORE_RULES } from './grammar-more.js';
-import { EXTRA_BANKS, MODAL_MEANINGS } from './grammar-extra.js';
+import { ARTICLE_NOUNS, EXTRA_BANKS, MODAL_MEANINGS } from './grammar-extra.js';
 
 // Each tuple is [prompt, correct answer, distractors]. Templates vary subjects
 // and contexts. Curated subsets below keep coverage without padding every topic to 80.
@@ -292,7 +291,7 @@ const comparisons = [
 const banks = {
   sein: seinScenarios.map(([prompt, answer]) => question(prompt, answer, ['bin', 'bist', 'ist', 'sind', 'seid'])),
   present: presentSentences.map(([subject, person, stem, rest]) => question(`${subject} ${stem}___ ${rest}.`, PERSON_ENDINGS[person], ['e', 'st', 't', 'en'])),
-  articles: WORDS.filter(word => word.pos === 'noun').slice(0, 80).map(word => {
+  articles: ARTICLE_NOUNS.map(word => {
     const [article, ...noun] = word.de.split(' ');
     return question(`___ ${noun.join(' ')} (nominative: the)`, article, ['der', 'die', 'das', 'den']);
   }),

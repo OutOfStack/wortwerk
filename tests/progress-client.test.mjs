@@ -7,8 +7,9 @@ import * as levels from '../public/levels.js';
 import * as grammar from '../public/grammar-progress.js';
 import { RULES } from '../public/grammar.js';
 import { THEORY } from '../public/grammar-theory.js';
+import { topicIcon } from '../public/topic-icons.js';
 
-const source = (await readFile('public/app.js', 'utf8')).replace(/^import .* from '\.\/(vocabulary|levels|grammar|grammar-progress|grammar-theory)\.js';\n/gm, '');
+const source = (await readFile('public/app.js', 'utf8')).replace(/^import .* from '\.\/(vocabulary|levels|grammar|grammar-progress|grammar-theory|topic-icons)\.js';\n/gm, '');
 const empty = () => ({ xp: 0, xpVersion: 2, vocabularyVersion: 1, knownWordIds: [], answered: 0, correct: 0, wordMastery: {}, grammarVersion: 3, grammarProgress: {}, streak: 1, sound: true, activity: [0,0,0,0,0,0,0] });
 const user = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', email: 'alice@example.test' };
 const response = (body, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
@@ -72,22 +73,22 @@ test('shuffling preserves entries and choices vary without changing the source p
   app.evaluate('Math.random=originalRandom');
 });
 
-test('eight correct recalls retire a word, incorrect and duplicate answers do not advance it', async () => {
+test('six correct recalls retire a word, incorrect and duplicate answers do not advance it', async () => {
   const app = boot(async () => response({ user: null }));
   await settle();
   app.evaluate('state=structuredClone(defaultState)');
   const prepare = "session={type:'words',pool:[WORDS[2]],items:[WORDS[2]],index:0,roundCorrect:0,current:{kind:'type',answer:WORDS[2].de,word:WORDS[2]}}";
-  for (let i=0;i<7;i++) {
+  for (let i=0;i<5;i++) {
     app.evaluate(prepare + ";answer('KASE');answer('KASE')");
     assert.equal(app.evaluate('wordCorrect(WORDS[2])'), i+1);
   }
   assert.equal(app.evaluate('pendingWords([WORDS[2]]).length'), 1);
   app.evaluate(prepare + ";answer('Brot')");
-  assert.equal(app.evaluate('wordCorrect(WORDS[2])'), 7);
+  assert.equal(app.evaluate('wordCorrect(WORDS[2])'), 5);
   app.evaluate(prepare + ";answer('kaese')");
-  assert.equal(app.evaluate('wordCorrect(WORDS[2])'), 8);
+  assert.equal(app.evaluate('wordCorrect(WORDS[2])'), 6);
   assert.equal(app.evaluate('pendingWords([WORDS[2]]).length'), 0);
-  assert.equal(JSON.parse(app.storage.get('wortwerk-guest-progress')).wordCorrectCounts['2'], 8);
+  assert.equal(JSON.parse(app.storage.get('wortwerk-guest-progress')).wordCorrectCounts['2'], 6);
   assert.match(app.elements.get('#feedback').innerHTML, /Learned!/);
   app.evaluate('startWords([WORDS[2]])');
   assert.equal(app.evaluate('session'), null);
@@ -95,10 +96,13 @@ test('eight correct recalls retire a word, incorrect and duplicate answers do no
 });
 
 test('saved learned words are excluded after account reload and short rounds keep their selection', async () => {
-  const progress = { ...empty(), wordCorrectCounts: { '0': 8, '1': 7 } };
+  // Counts of 7 and 8 were saved under the earlier eight-answer target.
+  const progress = { ...empty(), wordCorrectCounts: { '0': 8, '1': 4, '2': 7 } };
   const app = boot(async path => response(path === '/api/auth/me' ? { user } : { userId: user.id, progress, revision: 4 }));
   await settle();
-  app.evaluate('startWords([WORDS[0],WORDS[1]])');
+  assert.equal(app.evaluate('wordCorrect(WORDS[0])'), 6);
+  assert.equal(app.evaluate('wordCorrect(WORDS[2])'), 6);
+  app.evaluate('startWords([WORDS[0],WORDS[1],WORDS[2]])');
   assert.equal(app.evaluate('session.items.length'), 1);
   assert.equal(app.evaluate('session.items[0].id'), 1);
   assert.equal(app.evaluate('session.current.kind'), 'type');
@@ -210,7 +214,7 @@ function boot(fetch, guestProgress = { ...empty(), xp: 555 }, windowExtras = {})
   const storage = new Map([['wortwerk-progress', JSON.stringify({ ...empty(), xp: 99999 })], ['wortwerk-guest-progress', JSON.stringify(guestProgress)]]);
   const context = vm.createContext({
     structuredClone, setTimeout, clearTimeout, fetch,
-    ...levels, ...grammar, RULES, THEORY, VOCABULARY_VERSION,
+    ...levels, ...grammar, RULES, THEORY, topicIcon, VOCABULARY_VERSION,
     document: { querySelector: s => { if (!elements.has(s)) elements.set(s, element()); return elements.get(s); }, querySelectorAll: () => [], createElement: element },
     localStorage: { getItem: k => storage.get(k), setItem: (k, v) => storage.set(k, v) },
     window: { addEventListener() {}, ...windowExtras }, location: { assign() {} },
@@ -465,8 +469,19 @@ test('streaks follow calendar days and the log keeps the latest 60 days', async 
   app.evaluate('recordActivity()');
   assert.equal(app.evaluate('state.streak'), 5, 'further answers today do not extend the streak');
   assert.equal(app.evaluate('answersOn(daysAgo(0))'), 2);
-  app.evaluate("state.activityLog={[dayKey(daysAgo(2))]:1};state.streak=9;recordActivity()");
-  assert.equal(app.evaluate('state.streak'), 1, 'a missed day restarts the streak');
+  app.evaluate("state.activityLog={[dayKey(daysAgo(2))]:1};state.streak=9;delete state.streakFreezeDay");
+  assert.equal(app.evaluate('currentStreak()'), 9, 'a single missed day keeps the streak visible');
+  app.evaluate('recordActivity()');
+  assert.equal(app.evaluate('state.streak'), 10, 'one missed day a week is forgiven');
+  assert.equal(app.evaluate('state.streakFreezeDay'), app.evaluate('dayKey(daysAgo(1))'));
+  app.evaluate("state.activityLog={[dayKey(daysAgo(2))]:1};state.streak=9;state.streakFreezeDay=dayKey(daysAgo(6))");
+  assert.equal(app.evaluate('currentStreak()'), 0, 'a second missed day within a week ends the streak');
+  app.evaluate('recordActivity()');
+  assert.equal(app.evaluate('state.streak'), 1, 'a second missed day within a week restarts the streak');
+  app.evaluate("state.activityLog={[dayKey(daysAgo(2))]:1};state.streak=9;state.streakFreezeDay=dayKey(daysAgo(8));recordActivity()");
+  assert.equal(app.evaluate('state.streak'), 10, 'the allowance returns a week after the last forgiven day');
+  app.evaluate("state.activityLog={[dayKey(daysAgo(3))]:1};state.streak=9;delete state.streakFreezeDay;recordActivity()");
+  assert.equal(app.evaluate('state.streak'), 1, 'two missed days in a row restart the streak');
   app.evaluate('state.activityLog=Object.fromEntries([...Array(70).keys()].map(i=>[dayKey(daysAgo(i+1)),1]));recordActivity()');
   assert.equal(app.evaluate('Object.keys(state.activityLog).length'), 60);
   assert.equal(app.evaluate('answersOn(daysAgo(0))'), 1);
@@ -510,16 +525,16 @@ test('later grammar rounds draw a stable mix from the larger bank', async () => 
   assert.equal(app.evaluate('session.missed.length'), 1);
 });
 
-test('word search ignores articles, case and umlaut spelling', async () => {
+test('vocabulary overview shows a single-colour icon for every topic and no word search', async () => {
   const app = boot(async () => response({ user: null }));
   await settle();
-  for (const query of ['Käse', 'kaese', 'KASE', 'der käse', 'cheese']) {
-    assert.equal(app.evaluate(`WORDS.filter(w=>searchKey(w.de).includes(searchKey(${JSON.stringify(query)}))||w.en.split(' / ').some(en=>searchKey(en).includes(searchKey(${JSON.stringify(query)})))).some(w=>w.de==='der Käse')`), true, query);
+  app.evaluate('renderWords()');
+  const html = app.elements.get('#content').innerHTML;
+  assert.doesNotMatch(html, /wordQuery|Find a word/);
+  for (const topic of new Set(WORDS.map(word => word.topic))) {
+    const card = html.match(new RegExp(`data-topic="${topic}"><span class="lesson-icon topic-icon">(.*?)</span>`))?.[1];
+    assert.match(card ?? '', /^<svg [^>]*stroke="currentColor"[^>]*aria-hidden="true">/, topic);
   }
-  app.evaluate("renderWords();renderWordResults('Kaese')");
-  assert.match(app.elements.get('#wordResults').innerHTML, /der Käse/);
-  app.evaluate("renderWordResults('zzzz')");
-  assert.match(app.elements.get('#wordResults').innerHTML, /No matching words/);
 });
 
 test('pronunciation uses a German browser voice, auto-plays answers and hides without speech support', async () => {
@@ -626,20 +641,20 @@ test('guided practice starts above stats with new A1 words and the exact adverti
   await settle();
   const html = app.elements.get('#content').innerHTML;
   assert.ok(html.indexOf('id="guidedStart"') < html.indexOf('class="stats"'));
-  assert.match(html, /8 new A1 words/);
+  assert.match(html, /10 new A1 words/);
   assert.doesNotMatch(html, /0%<\/strong><small>answer accuracy/);
   app.elements.get('#guidedStart').onclick();
   assert.equal(app.evaluate('session.guided'), true);
-  assert.equal(app.evaluate('session.items.length'), 8);
+  assert.equal(app.evaluate('session.items.length'), 10);
   assert.equal(app.evaluate("session.items.every(word=>word.level==='A1')"), true);
-  assert.equal(app.evaluate('new Set(session.items.map(word=>word.id)).size'), 8);
+  assert.equal(app.evaluate('new Set(session.items.map(word=>word.id)).size'), 10);
 });
 
 test('guided rounds balance revisits and new words, exclude complete words, and handle exhaustion', async () => {
   const app = boot(async () => response({ user: null }), empty());
   await settle();
   app.evaluate('state.wordMastery=Object.fromEntries(WORDS.slice(0,6).map(word=>[word.id,0]));state.wordCorrectCounts={6:8};state.knownWordIds=["7"];startGuidedRound()');
-  assert.equal(app.evaluate('session.items.filter(wasPractised).length'), 4, 'even words answered incorrectly are revisited');
+  assert.equal(app.evaluate('session.items.filter(wasPractised).length'), 5, 'even words answered incorrectly are revisited');
   assert.equal(app.evaluate('session.items.some(word=>word.id===6||word.id===7)'), false);
   assert.equal(app.evaluate("session.items.filter(word=>!wasPractised(word)).every(word=>word.level==='A1')"), true);
   app.evaluate('state.knownWordIds=WORDS.slice(2).map(word=>String(word.id));startGuidedRound()');
