@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { RULES } from '../public/grammar.js';
+import { WORDS } from '../public/vocabulary.js';
 import { THEORY } from '../public/grammar-theory.js';
 import { RULE_IDS, ruleTarget, recordGrammarAnswer, grammarStatus, exerciseDeck } from '../public/grammar-progress.js';
 import { upgradeProgress } from '../public/levels.js';
@@ -216,6 +217,22 @@ test('extra exercise banks are valid, distinct from curated exercises and mixed 
     }
     assert.ok([1, 2, 3].some(cycle => exerciseDeck(rule, cycle).some(exercise => rule.extra.includes(exercise))), rule.id);
   }
+});
+
+test('the article drill starts with everyday A1 nouns and keeps further common nouns for later rounds', () => {
+  const rule = RULES.find(rule => rule.id === 'articles');
+  const level = Object.fromEntries(WORDS.map(word => [word.de.split(' ').slice(1).join(' '), word.level]));
+  const noun = ([prompt]) => prompt.replace(/^___ /, '').replace(/ \(.*\)$/, '');
+  assert.ok(rule.qs.every(exercise => level[noun(exercise)] === 'A1'), 'the first round uses A1 nouns only');
+  for (const [de, article] of [['Mann', 'der'], ['Frau', 'die'], ['Kind', 'das'], ['Mädchen', 'das'], ['Hund', 'der'], ['Katze', 'die']]) {
+    assert.equal(rule.qs.find(exercise => noun(exercise) === de)?.[1], article, de);
+  }
+  // Positions of the original A1 nouns stay fixed so unfinished rounds resume in place.
+  assert.deepEqual(rule.qs.slice(0, 22).map(noun), WORDS.filter(word => word.pos === 'noun').slice(0, 22).map(word => word.de.split(' ').slice(1).join(' ')));
+  const later = rule.extra.map(noun);
+  assert.ok(later.length >= 300);
+  assert.ok(['Schwester', 'Bruder', 'Fahrrad', 'Wohnung', 'Baum'].every(de => later.includes(de)));
+  assert.equal(new Set([...rule.qs.map(noun), ...later]).size, rule.qs.length + later.length, 'no noun repeats between rounds');
 });
 
 test('conjugation and sentence fixes stay correct', () => {

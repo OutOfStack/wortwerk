@@ -7,9 +7,10 @@ An early German A1–A2 practice app with English instructions.
 - German → English and English → German multiple-choice vocabulary exercises.
 - English → German typed recall, letter-building and noun-article (der/die/das) exercises.
 - 1,194 vocabulary entries across 28 topics and 24 grammar topics with 20–80 exercises per round,
-  drawn from a bank of 2,328 grammar exercises.
+  drawn from a bank of 2,599 grammar exercises.
 - Randomized multiple-choice answers use the same part of speech, preferring the same topic and level.
-- Per-word progress: eight correct answers retire a word from normal practice.
+- Vocabulary rounds have 10 words.
+- Per-word progress: six correct answers retire a word from normal practice.
 - “I know this” hides a word without awarding XP; restore it under Progress → Words marked known.
 - Vocabulary accepts optional articles, capitalization and alternative umlaut spellings.
 - Grammar completion at a topic-specific rolling target of at least 87.5%, with saved exercise positions.
@@ -22,8 +23,9 @@ An early German A1–A2 practice app with English instructions.
   in letter-building. Letter tiles also have Undo and Clear.
 - Guided practice above the homepage stats revisits up to four practised words, then adds new A1 words before A2.
 - End-of-round review and targeted retry of missed words and sentences. Grammar retries earn XP without changing assessment history or the saved exercise position.
-- Word search (ignores articles, case and umlaut spelling) with per-word status.
-- Daily streak and a last-7-days chart based on local calendar days.
+- Vocabulary topics with single-colour Lucide icons (ISC licence, `public/topic-icons.js`).
+- Daily streak (one missed day a week is forgiven) and a last-7-days chart based on local calendar days.
+- Web app manifest with 192/512 px and maskable PNG icons, so installed launch screens stay sharp.
 - A responsive interface for phones and desktops; answer feedback stays in view.
 
 - Pronunciation through the browser's built-in speech synthesis (German voice).
@@ -35,7 +37,7 @@ This is a prototype, not a complete A1/A2 curriculum.
 
 Speaker buttons read German aloud with the Web Speech API (`speechSynthesis`):
 no API key, server or audio files. They appear next to German prompts, answer
-feedback, search results, known words, mistake reviews and theory examples.
+feedback, known words, mistake reviews and theory examples.
 English prompts never get a button, so listening cannot reveal a typed answer.
 After each answer the word (with its article) or the completed sentence is read
 automatically; the 🔊/🔇 button in the top bar toggles this and is saved as the
@@ -63,8 +65,8 @@ anywhere until the learner asks.
 A correct answer earns **1 XP** when it is chosen from options or built from
 given letters, and **2 XP** when it is typed (vocabulary recall or grammar in
 Type mode). Wrong answers and “I know this” earn nothing. A word retires after
-eight correct answers, three of which are typed, so a new word earns up to
-11 XP. `XP_VERSION` stays at 2: stored totals are not changed, and old open tabs
+six correct answers, two of which are typed, so a new word earns up to
+8 XP. `XP_VERSION` stays at 2: stored totals are not changed, and old open tabs
 simply keep awarding 1 XP until they reload.
 
 Level 1 starts at 0 XP. Reaching Level 2 takes 30 XP; each subsequent step costs
@@ -118,17 +120,19 @@ belong to the account and sync through D1.
 progress request limit is 64 KiB to accommodate all 1,194 word records, known IDs,
 all grammar histories and the activity log together (about 40 KiB at most).
 
-Each word cycles through its eight correct answers as: German → English choice,
-typed recall, letter building, English → German choice, typed recall, article
-choice for nouns (letter building otherwise), German → English choice and typed
-recall.
+Each word cycles through its six correct answers as: German → English choice,
+typed recall, letter building, English → German choice, typed recall, and article
+choice for nouns (letter building otherwise). Counts saved under the earlier
+eight-answer target are read as at most six, so those words count as learned.
 
 ## Streaks and activity
 
 `activityLog` stores answers per local calendar day (`YYYY-MM-DD`) for the latest
 60 days. The first answer of a day extends the streak if the previous day had
-practice and restarts it otherwise; the streak shows as 0 after a full day
-without practice. Older progress without a log starts a fresh streak. The legacy
+practice. One missed day per week is forgiven: if only the previous day was
+missed and no day was forgiven in the preceding seven days, the streak continues
+and `streakFreezeDay` records the forgiven day. Otherwise it restarts, and the
+streak shows as 0 once a missed day can no longer be forgiven. Older progress without a log starts a fresh streak. The legacy
 weekday `activity` array is still written for compatibility but no longer drives
 the chart. Marking a word known is not counted as activity.
 
@@ -162,6 +166,10 @@ a combined topic. The Partizip II topic focuses on formation alongside the
 existing Perfekt topic. Existing conjugation and weil/dass rules keep their
 progress IDs rather than creating duplicate rules.
 
+The first article round uses everyday A1 nouns (der Mann, die Frau, das Kind,
+das Mädchen…); later article rounds draw from every other A1 noun in the
+vocabulary as well.
+
 Broad topics have 80 exercises per round for repeated practice across forms and
 contexts; narrower topics keep 20–40 exercises. Each topic’s window equals its
 round size.
@@ -176,7 +184,7 @@ adds -t/-d and -s/-z spelling patterns (du arbeitest, du tanzt) to present tense
 
 The first round keeps the curated order. Later rounds draw a deterministic,
 shuffled selection of the same size from the curated exercises plus an extra
-bank (`public/grammar-extra.js`, 828 exercises with more people, nouns, verbs,
+bank (`public/grammar-extra.js`, 1,051 exercises with more people, nouns, verbs,
 questions and sentence patterns). The selection depends only on the topic and
 round number, so reloading resumes the same exercise. Window sizes, passing
 targets and saved histories are unchanged. The passing target is `ceil(count × 7 / 8)`:
@@ -347,7 +355,7 @@ and [CPU limits](https://developers.cloudflare.com/workers/platform/limits/#cpu-
 - `public/vocabulary.js`: shared vocabulary catalog with permanent word IDs and parts of speech.
 - `public/levels.js`: XP rewards, rank thresholds and legacy XP conversion.
 - `public/grammar.js`: 1,500 first-round grammar exercises across 24 topics.
-- `public/grammar-extra.js`: 828 further exercises mixed into later rounds.
+- `public/grammar-extra.js`: 1,051 further exercises mixed into later rounds.
 - `public/grammar-config.js`: topic sizes and passing targets shared by client and server.
 - `public/grammar-more.js`: local adverbs, separable/reflexive verbs, participles and countability.
 - `public/grammar-topics.js`: additional foundational topic exercises and explanations.

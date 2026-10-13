@@ -92,6 +92,7 @@ test('accounts, password policy, protected progress, rate limits and revocable s
       wordCorrectCounts: Object.fromEntries(WORDS.map(word => [word.id, 8])),
       knownWordIds: WORDS.map(word => String(word.id)),
       activityLog: Object.fromEntries([...Array(60).keys()].map(day => [new Date(Date.UTC(2026, 0, day + 1)).toISOString().slice(0, 10), 25])),
+      streakFreezeDay: '2026-02-14',
     };
     assert.equal((await call('/api/progress', { ...save, revision: 2, progress: expandedProgress }, a.cookie)).response.status, 200);
     assert.deepEqual((await call('/api/progress', undefined, a.cookie)).result.progress, expandedProgress, 'every new word can be saved and reloaded');
@@ -101,6 +102,7 @@ test('accounts, password policy, protected progress, rate limits and revocable s
     for (const activityLog of [{ yesterday: 1 }, { '2026-01-01': -1 }, Object.fromEntries([...Array(61).keys()].map(day => [new Date(Date.UTC(2026, 0, day + 1)).toISOString().slice(0, 10), 1]))]) {
       assert.equal((await call('/api/progress', { ...save, revision: 3, progress: { ...expandedProgress, activityLog } }, a.cookie)).response.status, 400, 'activity logs are dated, non-negative and bounded');
     }
+    assert.equal((await call('/api/progress', { ...save, revision: 3, progress: { ...expandedProgress, streakFreezeDay: 'yesterday' } }, a.cookie)).response.status, 400, 'the forgiven streak day is a date');
 
     const legacyProgress = { ...expandedProgress, xp: 508, ruleMastery: { sein: 90 } };
     delete legacyProgress.grammarVersion;
