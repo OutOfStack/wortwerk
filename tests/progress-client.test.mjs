@@ -447,7 +447,7 @@ test('vocabulary rounds add English-to-German recognition and noun gender practi
   const app = boot(async () => response({ user: null }));
   await settle();
   const cheese = WORDS.find(word => word.de === 'der Käse');
-  const reverse = app.evaluate(`wordForm(WORDS.find(word=>word.id===${cheese.id}),3)`);
+  const reverse = app.evaluate(`wordForm(WORDS.find(word=>word.id===${cheese.id}),1)`);
   assert.equal(reverse.kind, 'choice');
   assert.equal(reverse.prompt, 'cheese');
   assert.equal(reverse.opts.length, 4);
@@ -458,6 +458,7 @@ test('vocabulary rounds add English-to-German recognition and noun gender practi
   const verb = WORDS.find(word => word.de === 'kommen');
   assert.equal(app.evaluate(`wordForm(WORDS.find(word=>word.id===${verb.id}),5).kind`), 'letters', 'only nouns get article practice');
   assert.equal(app.evaluate(`wordForm(WORDS.find(word=>word.id===${verb.id}),7).kind`), 'type');
+  assert.equal(app.evaluate(`wordForm(WORDS.find(word=>word.id===${verb.id}),3).kind`), 'type', 'typing waits until two recognition choices');
 });
 
 test('streaks follow calendar days and the log keeps the latest 60 days', async () => {
@@ -791,4 +792,55 @@ test('perfect rounds do not offer a mistake retry and known words stay excluded 
   assert.match(app.elements.get('#content').innerHTML, /1 marked known without XP/);
   assert.doesNotMatch(app.elements.get('#content').innerHTML, /id="retryMistakes"|NaN|Infinity/);
   assert.equal(app.evaluate('pendingWords([WORDS[1]]).length'), 0);
+});
+
+test('word order builds grammar sentences, accepts listed alternatives and leaves topic scores alone', async () => {
+  const app = boot(async () => response({ user: null }), empty());
+  await settle();
+  const pool = app.evaluate('orderSentences()');
+  assert.ok(pool.length > 500);
+  for (const { sentence, rule } of pool) {
+    const size = sentence.split(' ').length;
+    assert.ok(size >= 4 && size <= 9, sentence);
+    assert.match(sentence, /^[A-ZÄÖÜ].*[.!?]$/);
+    assert.equal(rule.level, 'A1', 'unstarted A2 topics stay out');
+  }
+  app.evaluate('startOrder();session.items=session.items.slice(0,2)');
+  const { opts, answer } = app.evaluate('session.current');
+  assert.notEqual(opts.join(' '), answer.slice(0, -1), 'tiles never start solved');
+  assert.deepEqual([...opts].sort(), answer.slice(0, -1).split(' ').sort());
+  app.evaluate('answer(session.current.answer)');
+  assert.equal(app.evaluate('state.xp'), levels.XP_REWARDS.choice);
+  app.elements.get('#next').onclick();
+  app.evaluate('answer("falsch")');
+  app.elements.get('#next').onclick();
+  assert.match(app.elements.get('#content').innerHTML, /1 of 2 correctly/);
+  assert.match(app.elements.get('#content').innerHTML, /sentences built/);
+  assert.equal(app.evaluate('JSON.stringify([state.grammarProgress,state.wordCorrectCounts])'), '[{},{}]');
+  app.elements.get('#retryMistakes').onclick();
+  assert.equal(app.evaluate('session.type+session.retry+session.items.length'), 'ordertrue1');
+  app.evaluate("session.pool=[{rule:RULES[0],sentence:'Heute lerne ich Deutsch.'},{rule:RULES[0],sentence:'Ich lerne heute Deutsch.'}];session.items=[session.pool[0]];session.index=0;renderOrderQuestion()");
+  assert.equal(app.evaluate("matchesAnswer('ich lerne Heute Deutsch')"), true, 'another order from the sentence bank counts');
+  assert.equal(app.evaluate("matchesAnswer('Deutsch lerne ich Heute')"), false);
+});
+
+test('matching pairs reviews met words with distinct meanings and leaves word counts alone', async () => {
+  const counts = Object.fromEntries(WORDS.slice(0, 30).map(word => [word.id, 2]));
+  const app = boot(async () => response({ user: null }), { ...empty(), wordCorrectCounts: counts });
+  await settle();
+  app.evaluate("startMatch();var tile=(side,id)=>({dataset:{side,id:String(id)},classList:{add(){},remove(){}},disabled:false})");
+  const boards = JSON.parse(app.evaluate('JSON.stringify(session.items)'));
+  assert.deepEqual(boards.map(board => board.length), [5, 5, 5]);
+  assert.ok(boards.flat().every(word => counts[word.id]), 'words already met come first');
+  const meanings = boards.flat().flatMap(word => word.en.toLowerCase().split(' / '));
+  assert.equal(new Set(meanings).size, meanings.length);
+  const [first, second, ...rest] = boards[0];
+  app.evaluate(`pickMatch(tile('de',${first.id}));pickMatch(tile('en',${second.id}))`);
+  assert.equal(app.evaluate('state.answered+","+state.correct+","+session.missed.length'), '1,0,1');
+  app.evaluate(`pickMatch(tile('en',${first.id}));pickMatch(tile('de',${first.id}))`);
+  assert.equal(app.evaluate('state.correct'), 1, 'either column can be tapped first');
+  assert.equal(app.evaluate('state.xp'), levels.XP_REWARDS.choice);
+  for (const word of [second, ...rest]) app.evaluate(`pickMatch(tile('de',${word.id}));pickMatch(tile('en',${word.id}))`);
+  assert.match(app.elements.get('#feedback').innerHTML, /All matched/);
+  assert.equal(app.evaluate('JSON.stringify(state.wordCorrectCounts)'), JSON.stringify(counts));
 });
