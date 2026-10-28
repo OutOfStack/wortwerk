@@ -78,7 +78,10 @@ const COMMON_NOUNS = [
 const nouns = WORDS.filter(word => word.pos === 'noun');
 const commonNouns = COMMON_NOUNS.map(de => nouns.find(word => word.de === de));
 let nextCommon = 0;
-export const ARTICLE_NOUNS = nouns.slice(0, 80).map(word => word.level === 'A2' ? commonNouns[nextCommon++] : word);
+// The replaced slots are the nouns that were A2 when the deck was built. They are fixed
+// by ID so later level corrections never reorder the deck.
+const REPLACED_SLOT_IDS = new Set([30, 31, 32, 33, 34, 56, 57, 58, 59, 68, 69, 70, 71, 72, 73, 100, 101, 102, 103, 108, 109, 110, 111, 112, 113, 114]);
+export const ARTICLE_NOUNS = nouns.slice(0, 80).map(word => REPLACED_SLOT_IDS.has(word.id) ? commonNouns[nextCommon++] : word);
 if (nextCommon !== COMMON_NOUNS.length || commonNouns.some(word => !word)) throw new Error('Article nouns must fill every A2 slot');
 
 // Every other common A1 noun, plus the earlier A2 selection, with the English meaning as a cue.

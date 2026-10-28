@@ -42,7 +42,9 @@ const progressFields = z.object({
   xp: counter, xpVersion: z.literal(XP_VERSION).optional(), answered: counter, correct: counter,
   wordMastery: z.record(wordId, score),
   wordCorrectCounts: z.record(wordId, z.number().int().min(0).max(8)).default({}),
-  vocabularyVersion: z.literal(VOCABULARY_VERSION).optional(),
+  // Spaced checks per learned word: [due day as whole days since 1970, review step].
+  wordReviews: z.record(wordId, z.tuple([counter, z.number().int().min(0).max(3)])).optional(),
+  vocabularyVersion: z.union([z.literal(1), z.literal(VOCABULARY_VERSION)]).optional(),
   knownWordIds: z.array(wordId).max(WORDS.length).refine(ids => new Set(ids).size === ids.length).optional(),
   ruleMastery: z.record(ruleId, score).optional(),
   grammarVersion: z.union([z.literal(1), z.literal(2), z.literal(GRAMMAR_VERSION)]).optional(),
@@ -76,7 +78,7 @@ export async function progressPost(db: D1Database, request: Request) {
     guardMutation(request);
     const user = await getUser(db, request);
     if (!user) throw new HttpError(401, 'Please sign in to save your progress.');
-    const body = await readJson(request, 65_536);
+    const body = await readJson(request, 131_072);
     const sent = (body as { progress?: { xpVersion?: unknown; grammarVersion?: unknown; vocabularyVersion?: unknown } } | null)?.progress;
     if (sent && typeof sent === 'object' && sent.xpVersion !== XP_VERSION) {
       throw new HttpError(409, 'The XP system has changed. Reload this page before saving progress.');

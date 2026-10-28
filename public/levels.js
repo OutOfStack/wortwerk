@@ -4,9 +4,10 @@ import { upgradeGrammar } from './grammar-progress.js';
 import { VOCABULARY_VERSION } from './vocabulary.js';
 
 // Recognition (choosing an option or building from given letters) earns 1 XP;
-// recalling and typing the answer earns 2. XP_VERSION stays at 2: stored totals
+// recalling and typing the answer earns 2. Learning a word and passing a grammar
+// topic add a one-time bonus. XP_VERSION stays at 2: stored totals
 // are unchanged, and a new version would rescale them as legacy XP.
-export const XP_REWARDS = { choice: 1, typed: 2 };
+export const XP_REWARDS = { choice: 1, typed: 2, wordLearned: 5, rulePassed: 20 };
 export const XP_VERSION = 2;
 
 // Level 2 costs 30 XP and each further step costs 40% more, rounded to a whole

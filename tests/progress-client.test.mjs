@@ -10,7 +10,7 @@ import { THEORY } from '../public/grammar-theory.js';
 import { topicIcon } from '../public/topic-icons.js';
 
 const source = (await readFile('public/app.js', 'utf8')).replace(/^import .* from '\.\/(vocabulary|levels|grammar|grammar-progress|grammar-theory|topic-icons)\.js';\n/gm, '');
-const empty = () => ({ xp: 0, xpVersion: 2, vocabularyVersion: 1, knownWordIds: [], answered: 0, correct: 0, wordMastery: {}, grammarVersion: 3, grammarProgress: {}, streak: 1, sound: true, activity: [0,0,0,0,0,0,0] });
+const empty = () => ({ xp: 0, xpVersion: 2, vocabularyVersion: VOCABULARY_VERSION, knownWordIds: [], answered: 0, correct: 0, wordMastery: {}, grammarVersion: 3, grammarProgress: {}, streak: 1, sound: true, activity: [0,0,0,0,0,0,0] });
 const user = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', email: 'alice@example.test' };
 const response = (body, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
 const settle = () => new Promise(resolve => setImmediate(resolve));
@@ -20,7 +20,7 @@ test('expanded vocabulary retains legacy progress identities and has valid uniqu
   for (const { id, de } of legacy) assert.equal(WORDS.find(word => word.id === id)?.de, de);
   assert.equal(new Set(WORDS.map(word => word.id)).size, WORDS.length);
   assert.equal(new Set(WORDS.map(word => word.de)).size, WORDS.length);
-  assert.equal(WORDS.length, 1194);
+  assert.equal(WORDS.length, 1583);
   assert.ok(WORDS.slice(1000).every((word, i) => word.id === 1000 + i), 'new words append new IDs');
   for (const word of WORDS) {
     assert.ok(Number.isInteger(word.id) && word.id >= 0);
@@ -50,7 +50,7 @@ test('every word has four distinct choices of the same part of speech and one co
 test('distractors prefer the topic and level, including verbs inside themed topics', async () => {
   const app = boot(async () => response({ user: null }));
   await settle();
-  for (const de of ['der Apfel', 'umsteigen', 'schwimmen', 'krank']) {
+  for (const de of ['der Apfel', 'umsteigen', 'schwimmen', 'groß']) {
     const word = WORDS.find(word => word.de === de);
     const opts = app.evaluate(`wordChoices(WORDS.find(word=>word.id===${word.id}))`);
     for (const option of opts) {
@@ -129,7 +129,7 @@ test('I know this works in every vocabulary mode without rewarding or recording 
     assert.equal(app.evaluate('session.skipped'), 1);
     const saved = JSON.parse(app.storage.get('wortwerk-guest-progress'));
     assert.deepEqual(saved.knownWordIds, ['0']);
-    assert.equal(saved.vocabularyVersion, 1);
+    assert.equal(saved.vocabularyVersion, VOCABULARY_VERSION);
     app.elements.get('#next').onclick();
     assert.match(app.elements.get('#content').innerHTML, /1 marked known without XP/);
     assert.doesNotMatch(app.elements.get('#content').innerHTML, /NaN|Infinity/);
@@ -433,10 +433,10 @@ test('shorter cycles carry their score and can pass on the first answer of a lat
   app.evaluate('answer(session.current.answer)');
   assert.equal(app.evaluate("ruleStatus('sein').correct"), 28);
   assert.equal(app.evaluate("ruleStatus('sein').passed"), true);
-  assert.equal(app.evaluate('state.xp'), 28);
+  assert.equal(app.evaluate('state.xp'), 28 + levels.XP_REWARDS.rulePassed, 'passing a topic adds a one-time bonus');
   app.elements.get('#next').onclick();
   assert.match(app.elements.get('#content').innerHTML, /Rule passed!/);
-  assert.equal(app.elements.get('#totalMastery').textContent, '1 grammar rules passed');
+  assert.equal(app.elements.get('#totalMastery').textContent, '0 words learned · 1 grammar rules passed');
   app.evaluate('renderGrammar()');
   assert.match(app.elements.get('#content').innerHTML, /<article class="rule passed"><div><span class="eyebrow">A1 · <span class="passed-badge">✓ Passed<\/span>/);
   assert.match(app.elements.get('#content').innerHTML, /aria-label="28 correct, 4 incorrect, 0 not answered/);
@@ -843,4 +843,83 @@ test('matching pairs reviews met words with distinct meanings and leaves word co
   for (const word of [second, ...rest]) app.evaluate(`pickMatch(tile('de',${word.id}));pickMatch(tile('en',${word.id}))`);
   assert.match(app.elements.get('#feedback').innerHTML, /All matched/);
   assert.equal(app.evaluate('JSON.stringify(state.wordCorrectCounts)'), JSON.stringify(counts));
+});
+
+test('learned words return as typed spaced checks that move only when due', async () => {
+  const app = boot(async () => response({ user: null }), { ...empty(), wordCorrectCounts: { '2': 5 } });
+  await settle();
+  const today = app.evaluate('dayNumber()');
+  const review = () => JSON.stringify(app.evaluate("state.wordReviews['2']"));
+  const prepare = "session={type:'words',pool:[WORDS[2]],items:[WORDS[2]],index:0,roundCorrect:0,current:{kind:'type',answer:WORDS[2].de,word:WORDS[2]}}";
+  app.evaluate(prepare + ";answer('käse')");
+  assert.equal(app.evaluate('state.xp'), levels.XP_REWARDS.typed + levels.XP_REWARDS.wordLearned);
+  assert.equal(review(), JSON.stringify([today + 3, 0]));
+  assert.match(app.elements.get('#feedback').innerHTML, /Learned! \+5 XP · next check in 3 days/);
+  assert.equal(app.evaluate('guidedWords().some(word=>word.id===2)'), false, 'a check waits until it is due');
+
+  app.evaluate(`state.wordReviews['2']=[${today},0];startGuidedRound()`);
+  assert.equal(app.evaluate('session.items[0].id'), 2, 'due checks come first');
+  assert.equal(app.evaluate('session.current.kind'), 'type');
+  assert.match(app.elements.get('#content').innerHTML, /Type the German translation · spaced check/);
+  app.evaluate("answer('käse')");
+  assert.equal(review(), JSON.stringify([today + 7, 1]));
+  app.evaluate(prepare + ";answer('käse')");
+  assert.equal(review(), JSON.stringify([today + 7, 1]), 'extra practice before the due day changes nothing');
+
+  app.evaluate(`state.wordReviews['2']=[${today},2];${prepare};answer('käse');renderProgress()`);
+  assert.equal(review(), JSON.stringify([today + 60, 3]));
+  assert.match(app.elements.get('#content').innerHTML, /6\/6 · Known · next check in 60 days/);
+  app.evaluate(`state.wordReviews['2']=[${today},3];${prepare};answer('Brot')`);
+  assert.equal(review(), JSON.stringify([today + 1, 0]), 'a missed check returns tomorrow');
+  assert.equal(app.evaluate('wordCorrect(WORDS[2])'), 6, 'a miss keeps the word learned');
+});
+
+test('words learned before spaced checks get first checks spread over two weeks', async () => {
+  const wordCorrectCounts = Object.fromEntries(WORDS.slice(0, 30).map(word => [String(word.id), 6]));
+  const app = boot(async () => response({ user: null }), { ...empty(), wordCorrectCounts, knownWordIds: ['1'] });
+  await settle();
+  const today = app.evaluate('dayNumber()');
+  const dues = [...app.evaluate('Object.values(state.wordReviews).map(entry=>entry[0])')];
+  assert.equal(dues.length, 29, 'words marked known get no checks');
+  assert.ok(dues.every(due => due > today && due <= today + 14));
+  assert.equal(new Set(dues).size, 14);
+  assert.equal(app.evaluate('guidedWords().filter(isCheckDue).length'), 0);
+  assert.match(app.elements.get('#totalMastery').textContent, /^30 words learned/);
+});
+
+test('typed vocabulary forgives one slipped letter but not endings, other words or grammar', async () => {
+  const app = boot(async () => response({ user: null }), empty());
+  await settle();
+  const slip = value => app.evaluate(`isSlip(${JSON.stringify(value)})`);
+  app.evaluate("session={type:'words',current:{kind:'type',answer:'die Kartoffel'}}");
+  for (const value of ['Kartofel', 'Kratoffel', 'Karttoffel', 'die Kartuffel']) assert.equal(slip(value), true, value);
+  for (const value of ['Kartoffl', 'Kartoffe', 'Kartoffeln', 'Katofel', 'Kartoffel']) assert.equal(slip(value), false, value);
+  app.evaluate("session.current.answer='der Tisch'");
+  assert.equal(slip('Tsich'), true);
+  assert.equal(slip('Fisch'), false, 'a slip that spells another listed word is a different answer');
+  app.evaluate("session.current.answer='der Käse'");
+  assert.equal(slip('Kase'), false, 'short words must be exact');
+  app.evaluate("session={type:'words',current:{kind:'choice',answer:'die Kartoffel'}}");
+  assert.equal(slip('Kartofel'), false);
+  app.evaluate("session={type:'grammar',current:{kind:'type',answer:'fährst'}}");
+  assert.equal(slip('fäharst'), false, 'grammar answers stay exact');
+
+  const word = WORDS.find(entry => entry.de === 'die Kartoffel');
+  app.evaluate(`state=structuredClone(defaultState);session={type:'words',pool:[WORDS[${word.id}]],items:[WORDS[${word.id}]],index:0,roundCorrect:0,current:{kind:'type',answer:WORDS[${word.id}].de,word:WORDS[${word.id}]}};answer('Kartofel')`);
+  assert.equal(app.evaluate('state.xp'), levels.XP_REWARDS.choice, 'a slip earns recognition XP');
+  assert.equal(app.evaluate(`wordCorrect(WORDS[${word.id}])`), 1);
+  assert.equal(app.elements.get('#feedback').className, 'feedback good');
+  assert.match(app.elements.get('#feedback').innerHTML, /Almost — mind the spelling.*die Kartoffel/s);
+});
+
+test('fully learned vocabulary and grammar still fit the progress size limit', async () => {
+  const app = boot(async () => response({ user: null }), empty());
+  await settle();
+  app.evaluate(`for(const word of WORDS){state.wordCorrectCounts[word.id]=6;state.wordMastery[word.id]=100;state.wordReviews[word.id]=[dayNumber()+60,3]}
+    state.knownWordIds=WORDS.map(word=>String(word.id));
+    for(const id of RULE_IDS)state.grammarProgress[id]={answers:Array(ruleTarget(id).size).fill(true),attempts:1000000000,passed:true};
+    for(let i=0;i<60;i++)state.activityLog[dayKey(daysAgo(i))]=1000000000;
+    Object.assign(state,{xp:1000000000,answered:1000000000,correct:1000000000,streak:1000000000,streakFreezeDay:'2026-10-28'})`);
+  const body = JSON.stringify({ userId: user.id, revision: 1000000000, progress: app.evaluate('state') });
+  assert.ok(Buffer.byteLength(body) < 131_072, `${Buffer.byteLength(body)} bytes`);
 });

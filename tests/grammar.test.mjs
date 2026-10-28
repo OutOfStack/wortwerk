@@ -219,11 +219,13 @@ test('extra exercise banks are valid, distinct from curated exercises and mixed 
   }
 });
 
-test('the article drill starts with everyday A1 nouns and keeps further common nouns for later rounds', () => {
+test('the article drill starts with everyday nouns and keeps further common nouns for later rounds', () => {
   const rule = RULES.find(rule => rule.id === 'articles');
-  const level = Object.fromEntries(WORDS.map(word => [word.de.split(' ').slice(1).join(' '), word.level]));
+  const id = Object.fromEntries(WORDS.map(word => [word.de.split(' ').slice(1).join(' '), word.id]));
   const noun = ([prompt]) => prompt.replace(/^___ /, '').replace(/ \(.*\)$/, '');
-  assert.ok(rule.qs.every(exercise => level[noun(exercise)] === 'A1'), 'the first round uses A1 nouns only');
+  // Level corrections must not change the first round: it keeps its original 80 nouns.
+  assert.equal(rule.qs.length, 80);
+  assert.ok(rule.qs.every(exercise => id[noun(exercise)] < 1194), 'the first round never takes newly added nouns');
   for (const [de, article] of [['Mann', 'der'], ['Frau', 'die'], ['Kind', 'das'], ['Mädchen', 'das'], ['Hund', 'der'], ['Katze', 'die']]) {
     assert.equal(rule.qs.find(exercise => noun(exercise) === de)?.[1], article, de);
   }
