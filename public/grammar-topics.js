@@ -1,9 +1,11 @@
 // Additional A1–A2 topics, with a curated exercise count for each topic.
+import { pluralOptions } from './grammar-options.js';
 const key = value => value.toLowerCase().trim();
 const q = (prompt, answer, choices) => {
   const options = [...new Map(choices.map(value => [key(value), value])).values()].filter(value => key(value) !== key(answer));
   // Sentence-initial capitalization must not reveal the correct option.
-  return [prompt, answer, prompt.startsWith('___') ? options.map(value => value[0].toUpperCase() + value.slice(1)) : options];
+  const cap = value => value[0].toUpperCase() + value.slice(1);
+  return prompt.startsWith('___') ? [prompt, cap(answer), options.map(cap)] : [prompt, answer, options];
 };
 const nouns = [
   ['der', 'Tisch'], ['die', 'Tasche'], ['das', 'Buch'], ['der', 'Stuhl'],
@@ -132,7 +134,7 @@ const wQuestions = [
 const banks = {
   plural: pluralNouns.flatMap(([singular, plural]) => {
     const noun = singular.split(' ').slice(1).join(' ');
-    const wrong = [noun, `${noun}e`, `${noun}en`, `${noun}s`, `${noun}er`];
+    const wrong = pluralOptions(noun, plural);
     return [q(`Choose the plural of “${singular}”.`, plural, wrong), q(`Ich sehe zwei ___. (${singular})`, plural, wrong)];
   }),
   // Frames rotate across nouns; the last of each group is an accusative object.
@@ -154,12 +156,13 @@ const banks = {
       q(`${ownerQuestions[n % ownerQuestions.length].replace('{article}', article).replace('{noun}', noun)} (${owner.pronoun})`, standalone, forms),
     ];
   })),
-  nominative: nouns.flatMap(([article, noun]) => {
+  nominative: nouns.flatMap(([article, noun], n) => {
     const capitalized = article[0].toUpperCase() + article.slice(1);
+    const sentence = [`${capitalized} ${noun} ist vor dem Haus.`, `Vor dem Haus ist ${article} ${noun}.`, `Heute ist ${article} ${noun} vor dem Haus.`][n % 3];
     return [
       q(`___ ${noun} ist hier. (the; subject)`, capitalized, definite),
       q(`___ ${noun} ist dort. (a / an; subject)`, article === 'die' ? 'Eine' : 'Ein', indefinite),
-      q(`Which phrase is nominative? “${capitalized} ${noun} ist vor dem Haus.”`, `${capitalized} ${noun}`, ['dem Haus', 'vor dem Haus', 'ist']),
+      q(`Which phrase is nominative? “${sentence}”`, `${article} ${noun}`, ['dem Haus', 'vor dem Haus', 'ist']),
       q(`Das ist ___ ${noun}. (the; after sein)`, article, definite),
     ];
   }),
@@ -181,11 +184,12 @@ const banks = {
     const others = ['mit', 'ohne', 'für', 'durch', 'gegen', 'um', 'aus', 'bei', 'nach', 'zu', 'von', 'seit', 'bis', 'ab', 'am', 'im', 'vor', 'in'].filter(value => value !== answer);
     return q(`${name} ${sentence} (${hint})`, answer, [0, 1, 2].map(k => others[(index * 3 + k * 5) % others.length]));
   })),
-  local: localPlaces.flatMap(([prep, article, noun, where, whereTo, datTail = '', accTail = '']) => {
+  local: localPlaces.flatMap(([prep, article, noun, where, whereTo, datTail = '', accTail = ''], index) => {
     const dat = article === 'die' ? 'der' : 'dem';
     const acc = article === 'der' ? 'den' : article;
     const hint = localMeanings[prep];
-    const options = Object.keys(localMeanings).filter(value => value !== prep).slice(0, 3);
+    const others = Object.keys(localMeanings).filter(value => value !== prep);
+    const options = [0, 1, 2].map(k => others[(index * 3 + k * 3) % others.length]);
     return [
       q(`${where} ${prep} ___ ${noun}${datTail}. (Wo?)`, dat, definite),
       q(`${whereTo} ${prep} ___ ${noun}${accTail}. (Wohin? New position.)`, acc, definite),

@@ -165,8 +165,8 @@ test('new topics cover direction, separation, reflexive cases, participles and c
   assert.equal(answerFor('reflexive', 'Ich wasche ___ die Hände. (my own hands)'), 'mir');
   assert.equal(answerFor('participle', 'Choose the Partizip II of “anrufen”.'), 'angerufen');
   assert.equal(answerFor('participle', 'Choose the Partizip II of “studieren”.'), 'studiert');
-  assert.equal(answerFor('countable', 'Ich sehe ___ Bücher. (many individual objects)'), 'viele');
-  assert.equal(answerFor('countable', 'Wir haben ___ Wasser. (a lot of the substance, not portions)'), 'viel');
+  assert.equal(answerFor('countable', 'Ich habe ___ Bücher. (a lot)'), 'viele');
+  assert.equal(answerFor('countable', 'Ich habe ___ Wasser. (a lot)'), 'viel');
   assert.equal(answerFor('separable', 'Ich weiß, dass du abends ___. (fernsehen)'), 'fernsiehst');
   assert.equal(answerFor('reflexive', 'Ihr ärgert ___ über den Regen. (reflexive)'), 'euch');
   assert.equal(answerFor('reflexive', 'Du merkst ___ die Adresse. (you memorize it)'), 'dir');
@@ -207,9 +207,9 @@ test('extra exercise banks are valid, distinct from curated exercises and mixed 
       const options = [answer, ...distractors].map(normalized);
       assert.equal(new Set(options).size, options.length, `Answer collision: ${prompt}`);
     }
-    assert.equal(exerciseDeck(rule, 0), rule.qs, 'the first round keeps the curated order');
+    assert.deepEqual(new Set(exerciseDeck(rule, 0)), new Set(rule.qs), 'first rounds keep all curated exercises');
     const size = ruleTarget(rule.id).size;
-    for (const cycle of [1, 2, 7]) {
+    for (const cycle of [0, 1, 2, 7]) {
       const deck = exerciseDeck(rule, cycle);
       assert.equal(deck.length, size, rule.id);
       assert.equal(new Set(deck.map(([prompt]) => prompt)).size, size, `${rule.id}: repeated exercise in a round`);
@@ -217,6 +217,90 @@ test('extra exercise banks are valid, distinct from curated exercises and mixed 
     }
     assert.ok([1, 2, 3].some(cycle => exerciseDeck(rule, cycle).some(exercise => rule.extra.includes(exercise))), rule.id);
   }
+});
+
+test('plural and separable options cannot be solved by umlauts or empty gaps', () => {
+  const plural = RULES.find(rule => rule.id === 'plural');
+  for (const [prompt, answer, others] of [...plural.qs, ...plural.extra]) {
+    if (/[äöüÄÖÜ]/.test(answer)) assert.ok(others.some(option => /[äöüÄÖÜ]/.test(option)), prompt);
+  }
+  const separable = RULES.find(rule => rule.id === 'separable');
+  for (const [prompt, answer, others] of [...separable.qs, ...separable.extra]) {
+    if (!answer.includes(' … ')) continue;
+    assert.ok(others.filter(option => !option.includes('—')).length >= 2, prompt);
+  }
+});
+
+test('nominative identification varies subject position without a capitalization giveaway', () => {
+  const exercises = RULES.find(rule => rule.id === 'nominative').qs.filter(([prompt]) => prompt.startsWith('Which phrase'));
+  const startsWithSubject = ([prompt, answer]) => prompt.split('“')[1].toLowerCase().startsWith(answer.toLowerCase());
+  assert.ok(exercises.some(startsWithSubject));
+  assert.ok(exercises.some(exercise => !startsWithSubject(exercise)));
+  for (const [prompt, answer, others] of exercises) {
+    assert.ok(others.some(option => /^[A-ZÄÖÜ]/.test(option) === /^[A-ZÄÖÜ]/.test(answer)), prompt);
+    assert.ok(prompt.toLowerCase().includes(answer.toLowerCase()), prompt);
+  }
+});
+
+test('local preposition distractors draw from the full set of relationships', () => {
+  const exercises = RULES.find(rule => rule.id === 'local').qs.filter(([, answer]) => ['in', 'auf', 'unter', 'neben', 'vor', 'hinter', 'über', 'an', 'zwischen'].includes(answer));
+  const choices = new Set(exercises.flatMap(([, , others]) => others));
+  assert.equal(choices.size, 9);
+  for (const [prompt, answer, others] of exercises) {
+    if (!['in', 'auf', 'unter'].includes(answer)) assert.ok(others.some(option => !['in', 'auf', 'unter'].includes(option)), prompt);
+  }
+});
+
+test('affected first rounds break answer cycles and resume deterministically', () => {
+  for (const id of ['present', 'reflexive', 'local', 'countable']) {
+    const rule = RULES.find(rule => rule.id === id);
+    const deck = exerciseDeck(rule, 0);
+    assert.notDeepEqual(deck, rule.qs, id);
+    const answers = deck.map(([, answer]) => answer);
+    for (const period of [2, 6, 8]) {
+      assert.ok(answers.slice(period, 24).some((answer, i) => answer !== answers[i]), `${id}: repeated answer cycle of ${period}`);
+    }
+    const progress = { answers: [true, false, true], attempts: 3, passed: false };
+    const restored = JSON.parse(JSON.stringify(progress));
+    assert.deepEqual(exerciseDeck(rule, 0)[grammarStatus(restored, id).next], deck[3]);
+    assert.deepEqual(recordGrammarAnswer(restored, true, id).answers, [true, false, true, true]);
+  }
+});
+
+test('countability uses sentence context and quantity hints shared by both noun types', () => {
+  const rule = RULES.find(rule => rule.id === 'countable');
+  const exercises = [...rule.qs, ...rule.extra];
+  assert.ok(exercises.every(([prompt]) => !/individual|substance|portions|as a whole/.test(prompt)));
+  for (const [hint, answers] of [['a lot', ['viel', 'viele']], ['a little / a few', ['wenig', 'wenige']], ['some', ['etwas', 'einige']]]) {
+    for (const answer of answers) assert.ok(exercises.some(([prompt, correct]) => prompt.endsWith(`(${hint})`) && correct === answer));
+  }
+  const firstSet = exerciseDeck(rule, 0).slice(0, 10);
+  assert.ok(firstSet.some(([, answer]) => answer === 'Zählbar'));
+  assert.ok(firstSet.some(([, answer]) => answer === 'Unzählbar'));
+});
+
+test('sentence-initial choices do not reveal the answer through capitalization', () => {
+  for (const rule of RULES) {
+    for (const [prompt, answer, distractors] of [...rule.qs, ...rule.extra]) {
+      if (!prompt.startsWith('___')) continue;
+      const upper = value => value[0] === value[0].toUpperCase();
+      assert.ok(distractors.every(option => upper(option) === upper(answer)), `${rule.id}: ${prompt}`);
+    }
+  }
+});
+
+test('word order mixes structures immediately and requires checking beyond the opening', () => {
+  const rule = RULES.find(rule => rule.id === 'wordorder');
+  assert.equal(rule.qs.length, 80);
+  for (const set of [rule.qs.slice(0, 10), rule.qs.slice(10, 20)]) {
+    assert.ok(set.some(([prompt]) => prompt.includes('yes/no question')));
+    assert.ok(set.some(([prompt]) => prompt.includes('starting with “Wann”')));
+    assert.ok(set.some(([, answer]) => /^(Ich|Du|Wir|Ihr|Anna|Paul|Die Kinder) /.test(answer)));
+    assert.ok(set.some(([, answer, distractors]) => distractors.some(wrong => wrong.split(' ').slice(0, 2).join(' ') === answer.split(' ').slice(0, 2).join(' '))));
+  }
+  const find = prompt => rule.qs.find(([text]) => text === prompt)?.[1];
+  assert.equal(find('Choose the statement starting with “Morgen”: du / möchtest / Brot / kaufen'), 'Morgen möchtest du Brot kaufen.');
+  assert.equal(find('Choose the yes/no question: Anna / trinkt / jetzt / Tee'), 'Trinkt Anna jetzt Tee?');
 });
 
 test('the article drill starts with everyday nouns and keeps further common nouns for later rounds', () => {
@@ -244,7 +328,7 @@ test('conjugation and sentence fixes stay correct', () => {
   assert.equal(find('reflexive', 'Wir rasieren ___ jeden Morgen. (reflexive)'), 'uns');
   assert.equal(find('reflexive', 'Ich ärgere ___ über den Lärm. (reflexive)'), 'mich');
   assert.equal(find('reflexive', 'Lena und ich kümmern ___ um die Katze. (reflexive)'), 'uns');
-  assert.equal(find('wordorder', 'Choose the correct statement: am Wochenende / Anna / trinkt / Tee'), 'Am Wochenende trinkt Anna Tee.');
+  assert.equal(find('wordorder', 'Choose the question starting with “Wann”: Anna / möchte / Tee / trinken'), 'Wann möchte Anna Tee trinken?');
   assert.equal(find('modal', '___ ich hier rauchen? (be allowed to)'), 'Darf');
   assert.equal(find('perfect', 'Die Kinder ___ in den Park gelaufen. (Perfekt)') ?? find('perfect', 'Mein Bruder ___ in den Park gelaufen. (Perfekt)'), 'ist');
   assert.equal(find('because', 'Ich komme später, weil ___. (ich / muss / noch arbeiten)'), 'ich noch arbeiten muss');

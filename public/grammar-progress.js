@@ -32,12 +32,11 @@ function seededOrder(length, seed) {
   return order;
 }
 
-// The first cycle keeps the curated order. Later cycles draw a shuffled window
-// from the curated and extra exercises, so repetition meets new sentences while
-// the window size and passing target stay unchanged.
+// Break template answer sequences in affected first rounds. Keep later-cycle
+// seeds unchanged so their saved positions still point to the same exercise.
 export function exerciseDeck(rule, cycle) {
-  if (!cycle) return rule.qs;
-  const pool = [...rule.qs, ...(rule.extra || [])];
+  if (!cycle && !['present', 'reflexive', 'local', 'countable'].includes(rule.id)) return rule.qs;
+  const pool = cycle ? [...rule.qs, ...(rule.extra || [])] : rule.qs;
   return seededOrder(pool.length, `${rule.id}:${cycle}`).slice(0, rule.qs.length).map(index => pool[index]);
 }
 

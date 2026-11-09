@@ -297,12 +297,33 @@ const banks = {
   }),
   accusative: accusativeQuestions(),
   modal: modalSentences.map(([verb, activity], i) => question(`${subjects[i % 8]} ___ ${activity}. (${MODAL_MEANINGS[verb]})`, MODAL_FORMS[verb][i % 8], MODAL_FORMS[verb])),
-  // Each clause appears twice, once per half of the round, with a different time phrase.
-  wordorder: twoPasses(clauses, ([subject, verb, rest], i, second) => {
+  // Mix structures from the first round, including distractors with the same opening.
+  wordorder: twoPasses(clauses, ([subject, verb, rest, infinitive], i, second) => {
     const time = timePhrases[(2 * i + (second ? 1 : 0)) % timePhrases.length];
+    const lowerTime = time[0].toLowerCase() + time.slice(1);
+    const capitalSubject = subject[0].toUpperCase() + subject.slice(1);
+    const modal = { ich: 'möchte', du: 'möchtest', wir: 'möchten', ihr: 'möchtet', 'die Kinder': 'möchten' }[subject] || 'möchte';
+    switch ((i + (second ? 2 : 0)) % 5) {
+      case 1:
+        return question(`Choose the statement starting with “${capitalSubject}”: ${subject} / ${verb} / ${lowerTime} / ${rest}`,
+          `${capitalSubject} ${verb} ${lowerTime} ${rest}.`,
+          [`${capitalSubject} ${lowerTime} ${verb} ${rest}.`, `${capitalSubject} ${lowerTime} ${rest} ${verb}.`]);
+      case 2:
+        return question(`Choose the yes/no question: ${subject} / ${verb} / ${lowerTime} / ${rest}`,
+          `${verb[0].toUpperCase()}${verb.slice(1)} ${subject} ${lowerTime} ${rest}?`,
+          [`${capitalSubject} ${lowerTime} ${rest} ${verb}?`, `${verb[0].toUpperCase()}${verb.slice(1)} ${subject} ${lowerTime} ${infinitive} ${rest}?`]);
+      case 3:
+        return question(`Choose the statement starting with “${time}”: ${subject} / ${modal} / ${rest} / ${infinitive}`,
+          `${time} ${modal} ${subject} ${rest} ${infinitive}.`,
+          [`${time} ${modal} ${infinitive} ${subject} ${rest}.`, `${time} ${modal} ${subject} ${rest} zu ${infinitive}.`, `${time} ${subject} ${modal} ${rest} ${infinitive}.`]);
+      case 4:
+        return question(`Choose the question starting with “Wann”: ${subject} / ${modal} / ${rest} / ${infinitive}`,
+          `Wann ${modal} ${subject} ${rest} ${infinitive}?`,
+          [`Wann ${modal} ${infinitive} ${subject} ${rest}?`, `Wann ${modal} ${subject} ${rest} zu ${infinitive}?`, `Wann ${subject} ${modal} ${rest} ${infinitive}?`]);
+    }
     return question(
       // Only the sentence-initial capital is dropped: am Montag, not am montag.
-      `Choose the correct statement: ${time[0].toLowerCase()}${time.slice(1)} / ${subject} / ${verb} / ${rest}`,
+      `Choose the correct statement: ${lowerTime} / ${subject} / ${verb} / ${rest}`,
       `${time} ${verb} ${subject} ${rest}.`,
       [`${time} ${subject} ${verb} ${rest}.`, `${time} ${subject} ${rest} ${verb}.`, `${time} ${rest} ${subject} ${verb}.`],
     );
@@ -344,7 +365,7 @@ export const RULES = [
   { id: 'articles', level: 'A1', title: 'Articles: der, die, das', desc: 'Gender and definite articles', tip: 'Choose the nominative article. Learn every noun together with its article.' },
   { id: 'accusative', level: 'A1', title: 'Accusative case', desc: 'Direct objects and einen', tip: 'Only masculine articles change: der → den, ein → einen. Use the / a hint to select the article type.' },
   { id: 'modal', level: 'A1', title: 'Modal verbs', desc: 'können, müssen, wollen, dürfen, sollen, möchten', tip: 'Conjugate the modal verb for the subject; the other verb stays in the infinitive at the end. The English cue names the modal.' },
-  { id: 'wordorder', level: 'A1', title: 'Word order', desc: 'Verb in position 2', tip: 'In a statement, the conjugated verb stays in the second position.' },
+  { id: 'wordorder', level: 'A1', title: 'Word order', desc: 'Statements, questions and modal sentence brackets', tip: 'Statements and W-questions put the conjugated verb second; yes/no questions put it first. With a modal, the infinitive goes at the end without zu.' },
   { id: 'perfect', level: 'A2', title: 'Perfect tense', desc: 'haben/sein + past participle', tip: 'Use sein for going, coming, travelling and staying; otherwise these exercises use haben.' },
   { id: 'dative', level: 'A2', title: 'Dative case', desc: 'Indirect objects, prepositions and locations', tip: 'Dative articles: dem / der / dem. Use dative after helfen, for recipients with geben, after mit / bei / zu / aus / von, and for static locations.' },
   { id: 'because', level: 'A2', title: 'Kausalsätze & dass', desc: 'Reasons with weil; statements with dass', tip: 'After weil or dass, put the conjugated verb at the end.' },

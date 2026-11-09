@@ -1,14 +1,15 @@
 // Additional exercises mixed into later practice cycles. The first cycle of each
-// topic keeps its curated order; these banks widen the people, nouns, verbs and
+// topic uses its curated questions; these banks widen the people, nouns, verbs and
 // sentence patterns without changing any topic's window size or progress keys.
 import { WORDS } from './vocabulary.js';
+import { pluralOptions, separatedOptions } from './grammar-options.js';
 
 const key = value => value.toLowerCase().trim();
 const cap = value => value[0].toUpperCase() + value.slice(1);
 const q = (prompt, answer, choices) => {
   const options = [...new Map(choices.map(value => [key(value), value])).values()].filter(value => key(value) !== key(answer));
   // Sentence-initial capitalization must not reveal the correct option.
-  return [prompt, answer, prompt.startsWith('___') ? options.map(cap) : options];
+  return prompt.startsWith('___') ? [prompt, cap(answer), options.map(cap)] : [prompt, answer, options];
 };
 // Person index: 0 ich, 1 du, 2 er / sie / es, 3 wir, 4 ihr, 5 sie / Sie.
 const SEIN = ['bin', 'bist', 'ist', 'sind', 'seid', 'sind'];
@@ -157,7 +158,7 @@ const wordorder = [
   ...bracketClauses.map(([front, verb, subject, middle, infinitive]) => q(
     `Choose the correct statement: ${lowerFirst(front)} / ${subject} / ${verb} / ${middle} / ${infinitive}`,
     `${front} ${verb} ${subject} ${middle} ${infinitive}.`,
-    [`${front} ${subject} ${verb} ${middle} ${infinitive}.`, `${front} ${verb} ${subject} ${infinitive} ${middle}.`, `${front} ${subject} ${middle} ${infinitive} ${verb}.`],
+    [`${front} ${subject} ${verb} ${middle} ${infinitive}.`, `${front} ${verb} ${subject} ${middle} zu ${infinitive}.`, `${front} ${verb} ${infinitive} ${subject} ${middle}.`],
   )),
   // Statement order with rising intonation is possible in speech, so it is never a distractor.
   ...yesNo.map(([subject, verb, rest]) => q(
@@ -284,7 +285,7 @@ const pluralNouns = [
 ];
 const plural = pluralNouns.flatMap(([singular, pluralForm, sentence]) => {
   const noun = singular.split(' ')[1];
-  const wrong = [noun, `${noun}e`, `${noun}en`, `${noun}s`, `${noun}er`];
+  const wrong = pluralOptions(noun, pluralForm);
   return [q(`Choose the plural of “${singular}”.`, pluralForm, wrong), q(`${sentence} (${singular})`, pluralForm, wrong)];
 });
 
@@ -472,9 +473,9 @@ const separableVerbs = [
 const separable = separableVerbs.flatMap(([infinitive, prefix, ich, , er, context, meaning], i) => {
   const rest = infinitive.slice(prefix.length);
   const name = pick(['Lena', 'Tom', 'Mia', 'Ben'], i);
-  // Every option uses the same person, so only the word order and the split decide the answer.
+  // Keep competing options with both gaps filled, as in the first round.
   const separated = (subject, form) =>
-    q(`${subject} ___ ${context} ___. (${infinitive})`, gaps(form, prefix), [gaps(`${prefix}${form}`), gaps('—', `${prefix}${form}`), gaps(form)]);
+    q(`${subject} ___ ${context} ___. (${infinitive})`, gaps(form, prefix), separatedOptions(form, prefix));
   return [
     separated('Ich', ich),
     separated(name, er),
@@ -522,22 +523,22 @@ const participle = participleVerbs.flatMap(([infinitive, form, sentence]) => {
 });
 
 const countable = [
-  q('Ich habe nur ___ Zeit. (a little of it as a whole)', 'wenig', ['wenige', 'viele', 'ein']),
-  q('Es gibt nur ___ Äpfel. (few individual objects)', 'wenige', ['wenig', 'viel', 'etwas']),
-  q('Wir haben ___ Geld. (a lot of it as a whole)', 'viel', ['viele', 'mehrere', 'ein']),
-  q('Im Park sind ___ Kinder. (many individual people)', 'viele', ['viel', 'etwas', 'ein']),
-  q('Möchtest du ___ Milch? (some; an indefinite amount)', 'etwas', ['einige', 'viele', 'eine']),
-  q('Ich kaufe ___ Tomaten. (several individual objects)', 'einige', ['etwas', 'viel', 'eine']),
+  q('Ich habe nur ___ Zeit. (a little / a few)', 'wenig', ['wenige', 'viele', 'ein']),
+  q('Es gibt nur ___ Äpfel. (a little / a few)', 'wenige', ['wenig', 'viel', 'etwas']),
+  q('Wir haben ___ Geld. (a lot)', 'viel', ['viele', 'mehrere', 'ein']),
+  q('Im Park sind ___ Kinder. (a lot)', 'viele', ['viel', 'etwas', 'ein']),
+  q('Möchtest du ___ Milch? (some)', 'etwas', ['einige', 'viele', 'eine']),
+  q('Ich kaufe ___ Tomaten. (some)', 'einige', ['etwas', 'viel', 'eine']),
   q('Ich möchte zwei ___ Wasser. (bottles)', 'Flaschen', ['Flasche', 'Wasser', 'Wassers']),
   q('Ich trinke eine ___ Tee. (cup)', 'Tasse', ['Tassen', 'Tee', 'Tees']),
   q('Wir brauchen ein ___ Mehl. (1,000 grams)', 'Kilo', ['Kilos', 'Mehl', 'Mehle']),
   q('Zwei ___ Brot, bitte. (slices)', 'Scheiben', ['Scheibe', 'Brote', 'Brots']),
-  q('“Honig” as a substance. Is it countable here?', 'Unzählbar', ['Zählbar']),
-  q('“die Banane” — one individual fruit. Is it countable here?', 'Zählbar', ['Unzählbar']),
-  q('“Geld” as an amount. Is it countable here?', 'Unzählbar', ['Zählbar']),
-  q('“der Stift” — one individual object. Is it countable here?', 'Zählbar', ['Unzählbar']),
-  q('Im Winter liegt ___ Schnee. (a lot of it as a whole)', 'viel', ['viele', 'mehrere', 'ein']),
-  q('Anna hat ___ Freunde. (many individual people)', 'viele', ['viel', 'etwas', 'ein']),
+  q('“Honig fließt vom Löffel.” Is “Honig” countable here?', 'Unzählbar', ['Zählbar']),
+  q('“Die Banane liegt auf dem Teller.” Is “Banane” countable here?', 'Zählbar', ['Unzählbar']),
+  q('“Ich spare Geld für den Urlaub.” Is “Geld” countable here?', 'Unzählbar', ['Zählbar']),
+  q('“Der Stift liegt neben dem Heft.” Is “Stift” countable here?', 'Zählbar', ['Unzählbar']),
+  q('Im Winter liegt ___ Schnee. (a lot)', 'viel', ['viele', 'mehrere', 'ein']),
+  q('Anna hat ___ Freunde. (a lot)', 'viele', ['viel', 'etwas', 'ein']),
 ];
 
 export const EXTRA_BANKS = {

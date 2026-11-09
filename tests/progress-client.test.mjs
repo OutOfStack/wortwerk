@@ -510,6 +510,24 @@ test('grammar feedback completes the sentence and typed grammar answers keep art
   assert.equal(app.evaluate("canType(['Countable?','Zählbar',['Unzählbar']])"), false);
 });
 
+test('shuffled first grammar rounds preserve scores and resume after a recorded answer', async () => {
+  for (const id of ['present', 'reflexive', 'local', 'countable']) {
+    const app = boot(async () => response({ user: null }), { ...empty(), grammarProgress: { [id]: { answers: [true, false, true], attempts: 3, passed: true } } });
+    await settle();
+    app.evaluate(`startRule('${id}')`);
+    const rule = RULES.find(rule => rule.id === id);
+    const deck = grammar.exerciseDeck(rule, 0);
+    assert.equal(app.evaluate('session.current.prompt'), deck[3][0]);
+    app.evaluate('answer(session.current.answer)');
+    const saved = JSON.parse(app.storage.get('wortwerk-guest-progress'));
+    assert.deepEqual(saved.grammarProgress[id], { answers: [true, false, true, true], attempts: 4, passed: true });
+    const restored = boot(async () => response({ user: null }), saved);
+    await settle();
+    restored.evaluate(`startRule('${id}')`);
+    assert.equal(restored.evaluate('session.current.prompt'), deck[4][0]);
+  }
+});
+
 test('later grammar rounds draw a stable mix from the larger bank', async () => {
   const app = boot(async () => response({ user: null }), { ...empty(), grammarProgress: { sein: { answers: Array(32).fill(true), attempts: 32, passed: true } } });
   await settle();
@@ -575,10 +593,12 @@ test('separable verbs use two gaps so the infinitive cue cannot reveal the prefi
   const all = [...separable.qs, ...separable.extra];
   assert.ok(all.every(([prompt, answer]) => !/\((\w+)\)$/.test(prompt) || !/^(auf|an|ein|aus|ab|mit|zu|vor|zurück|fern)$/.test(answer)), 'no single-prefix answers with a German infinitive cue');
   const found = all.find(([prompt]) => prompt === 'Paul ___ morgen ___. (ankommen)');
-  assert.deepEqual([found[1], [...found[2]].sort()], ['kommt … an', ['ankommt … —', 'kommt … —', '— … ankommt']]);
+  assert.deepEqual([found[1], found[2]], ['kommt … an', ['an … kommt', 'ankommt … an', 'ankommt … —']]);
   assert.ok(all.every(([prompt]) => !/___ .* (auf|an|ein|aus|ab|mit|zu|vor|zurück|fern)\. \(/.test(prompt)), 'the sentence never prints the prefix already');
-  const persons = ([, answer, options]) => new Set(options.map(option => option.split(' … ').find(part => part !== '—').replace(new RegExp(`^${answer.split(' … ')[1]}`), '')));
-  assert.ok(all.filter(([, answer]) => answer.includes(' … ')).every(item => persons(item).size === 1), 'main-clause options all share one verb form, so person agreement gives nothing away');
+  for (const [, answer, options] of all.filter(([, answer]) => answer.includes(' … '))) {
+    const [verb, prefix] = answer.split(' … ');
+    assert.ok(options.every(option => option.split(' … ').some(part => part === verb || part === prefix + verb)), 'all options keep the same conjugated verb');
+  }
   const modal = RULES.find(rule => rule.id === 'modal');
   assert.ok([...modal.qs, ...modal.extra].every(([prompt]) => !/\((können|müssen|wollen|dürfen|sollen|möchten)\)/.test(prompt)), 'modal cues are English');
   const app = boot(async () => response({ user: null }));

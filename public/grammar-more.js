@@ -1,3 +1,5 @@
+import { separatedOptions } from './grammar-options.js';
+
 const q = (prompt, answer, choices) => [prompt, answer, [...new Set(choices)].filter(option => option !== answer)];
 
 const localAdverbs = [
@@ -96,10 +98,19 @@ const participles = [
 ];
 
 const countNouns = [
-  ['das Buch', 'Bücher'], ['der Apfel', 'Äpfel'], ['der Stuhl', 'Stühle'], ['das Auto', 'Autos'],
-  ['die Flasche', 'Flaschen'], ['das Ticket', 'Tickets'], ['das Ei', 'Eier'], ['die Tasche', 'Taschen'],
+  ['das Buch', 'Bücher', 'Das Buch liegt auf dem Tisch.'], ['der Apfel', 'Äpfel', 'Der Apfel liegt im Korb.'],
+  ['der Stuhl', 'Stühle', 'Der Stuhl steht am Fenster.'], ['das Auto', 'Autos', 'Das Auto steht vor dem Haus.'],
+  ['die Flasche', 'Flaschen', 'Die Flasche ist leer.'], ['das Ticket', 'Tickets', 'Das Ticket liegt in meiner Tasche.'],
+  ['das Ei', 'Eier', 'Das Ei liegt im Kühlschrank.'], ['die Tasche', 'Taschen', 'Die Tasche hängt an der Tür.'],
 ];
-const massNouns = ['Wasser', 'Milch', 'Mehl', 'Zucker', 'Salz', 'Reis', 'Öl', 'Butter'];
+const massNouns = [
+  ['Wasser', 'Wasser fließt aus dem Hahn.'], ['Milch', 'Ich gieße Milch ins Glas.'],
+  ['Mehl', 'Mehl liegt auf der Arbeitsfläche.'], ['Zucker', 'Zucker löst sich im Tee auf.'],
+  ['Salz', 'Salz ist in der Suppe.'], ['Reis', 'Reis kocht im Topf.'],
+  ['Öl', 'Öl schwimmt auf dem Wasser.'], ['Butter', 'Butter schmilzt in der Pfanne.'],
+];
+const quantityHints = ['a lot', 'a little / a few', 'some'];
+const quantities = ['viel', 'viele', 'wenig', 'wenige', 'etwas', 'einige'];
 
 // Sentence practice complements direct participle recall, including auxiliaries
 // supplied in the prompt so this topic still tests participle formation.
@@ -119,10 +130,9 @@ const participleContexts = [
 // Two gaps, verb then prefix: the infinitive cue cannot give away the answer,
 // because the task is where each part goes. "—" leaves a gap empty.
 const gaps = (verb, end = '—') => `${verb} … ${end}`;
-// Main clause: the verb goes in the first gap and the prefix at the end. Every option
-// uses the same person, so only the word order and the split decide the answer.
+// Several options fill both gaps; learners must check the split and placement.
 const separated = (subject, context, infinitive, prefix, form) =>
-  q(`${subject} ___ ${context} ___. (${infinitive})`, gaps(form, prefix), [gaps(`${prefix}${form}`), gaps('—', `${prefix}${form}`), gaps(form)]);
+  q(`${subject} ___ ${context} ___. (${infinitive})`, gaps(form, prefix), separatedOptions(form, prefix));
 
 // Explicit forms keep irregular verbs and separable prefixes unambiguous.
 // [infinitive, du, ihr, Sie, sentence ending, short du form]
@@ -179,13 +189,13 @@ const banks = {
     return q(`Choose the Partizip II of “${infinitive}”.`, participle, [infinitive, `${stem}t`, `ge${infinitive}`, `${stem}ten`]);
   }),
   countable: [
-    ...countNouns.flatMap(([singular, plural]) => [
-      q(`“${singular}” — one individual object. Is it countable here?`, 'Zählbar', ['Unzählbar']),
-      q(`Ich sehe ___ ${plural}. (many individual objects)`, 'viele', ['viel', 'etwas', 'ein']),
+    ...countNouns.flatMap(([singular, plural, sentence], i) => [
+      q(`“${sentence}” Is “${singular.split(' ').slice(1).join(' ')}” countable here?`, 'Zählbar', ['Unzählbar']),
+      q(`Ich habe ___ ${plural}. (${quantityHints[i % 3]})`, ['viele', 'wenige', 'einige'][i % 3], quantities),
     ]),
-    ...massNouns.flatMap(noun => [
-      q(`“${noun}” as a substance, not portions or varieties. Is it countable here?`, 'Unzählbar', ['Zählbar']),
-      q(`Wir haben ___ ${noun}. (a lot of the substance, not portions)`, 'viel', ['viele', 'mehrere', 'ein']),
+    ...massNouns.flatMap(([noun, sentence], i) => [
+      q(`“${sentence}” Is “${noun}” countable here?`, 'Unzählbar', ['Zählbar']),
+      q(`Ich habe ___ ${noun}. (${quantityHints[i % 3]})`, ['viel', 'wenig', 'etwas'][i % 3], quantities),
     ]),
   ],
 };
@@ -244,7 +254,7 @@ export const MORE_THEORY = {
     note: 'Do not infer every participle from the infinitive: sehen → gesehen, nehmen → genommen, denken → gedacht. Learn the participle and auxiliary together for irregular verbs.',
   },
   countable: {
-    explanation: 'Countability depends on meaning and context. Individual objects can usually be counted: ein Buch, zwei Bücher. Substances used as a whole are usually uncountable: Wasser, Milch, Mehl. These exercises explicitly distinguish objects from substances.',
+    explanation: 'Countability depends on meaning and context. Individual objects can usually be counted: ein Buch, zwei Bücher. Substances used as a whole are usually uncountable: Wasser, Milch, Mehl. Use the sentence to decide how the noun is being used.',
     headers: ['Use', 'Countable objects', 'Substances as a whole'], rows: [['A large quantity', 'viele Bücher', 'viel Wasser'], ['A small quantity', 'wenige Bücher', 'wenig Wasser'], ['Number / measure', 'zwei Bücher', 'zwei Gläser Wasser'], ['Indefinite quantity', 'einige Bücher', 'etwas Wasser']],
     examples: [['Ich habe viele Bücher.', 'I have many books.'], ['Wir brauchen viel Mehl.', 'We need a lot of flour.'], ['Zwei Flaschen Wasser, bitte.', 'Two bottles of water, please.']],
     note: 'A substance can become countable when you mean portions or varieties: zwei Kaffee can mean two coffees in a café. In this topic, the substance questions exclude that meaning. German countability may differ from English.',

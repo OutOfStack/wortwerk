@@ -36,7 +36,7 @@ const BASE_THEORY={
   explanation:'In a normal statement, the conjugated verb is the second sentence element. The first element can be the subject, a time phrase, or a place phrase. A phrase such as am Montag counts as one element, even though it contains two words.',
   headers:['First element','Conjugated verb','Rest of the sentence'],rows:[['Ich','lerne','heute Deutsch.'],['Heute','lerne','ich Deutsch.'],['Am Montag','haben','wir frei.']],
   examples:[['Heute lerne ich Deutsch.','Today I am learning German.'],['Wann lernst du Deutsch?','When do you study German?'],['Lernst du Deutsch?','Are you learning German?']],
-  note:'When something other than the subject comes first, put the subject after the verb: heute lerne ich. In yes/no questions the verb comes first. In questions with a question word, it normally comes second.'
+  note:'When something other than the subject comes first, put the subject after the verb: heute lerne ich. In yes/no questions the verb comes first. In questions with a question word, it normally comes second. With a modal, put the other verb in the infinitive at the end, without zu: Ich möchte heute Deutsch lernen. Wann möchtest du Deutsch lernen?'
  },
  perfect:{
   explanation:'The Perfekt is commonly used to talk about completed past events, especially in conversation. Use a present-tense form of haben or sein plus a past participle at the end. Most verbs use haben. Many intransitive verbs describing a change of place or state use sein; sein and bleiben also use sein.',
