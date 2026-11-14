@@ -1,6 +1,7 @@
 import { WORDS, VOCABULARY_VERSION } from './vocabulary.js';
 import { RULES } from './grammar.js';
 import { THEORY } from './grammar-theory.js';
+import { GRAMMAR_EN } from './grammar-translations.js';
 import { GRAMMAR_VERSION, grammarStatus, recordGrammarAnswer, exerciseDeck } from './grammar-progress.js';
 import { topicIcon } from './topic-icons.js';
 import { RANK_TITLES, MAX_LEVEL, xpForLevel, rankTitle, rankMeaning, levelProgress, XP_REWARDS, XP_VERSION, upgradeProgress } from './levels.js';
@@ -73,34 +74,17 @@ function speak(text){
  speech.speak(utterance);
 }
 function speakButton(text){return speech&&text?`<button type="button" class="speak" data-speak="${esc(text)}" aria-label="Listen: ${esc(text)}" title="Listen">🔊</button>`:''}
-// English translation on request: Chrome's on-device Translator API when present,
-// otherwise a Google Translate link. Nothing is translated until the learner asks.
-const translations=new Map();let translatorReady=null,translatorBroken=false;
-function googleTranslate(text){return `https://translate.google.com/?sl=de&tl=en&op=translate&text=${encodeURIComponent(text)}`}
-function translateButton(text){
- if(!text)return '';
- return window.Translator&&!translatorBroken?`<button type="button" class="translate" data-translate="${esc(text)}" aria-label="Show English translation" title="Show English translation">EN</button>`:`<a class="translate" href="${esc(googleTranslate(text))}" target="_blank" rel="noopener" aria-label="Translate to English in a new tab" title="Translate to English (opens Google Translate)">EN ↗</a>`;
+// English meaning of a grammar item: its German sentence, else the German quoted in the
+// prompt. Single words (articles, plurals, comparatives, participles) use vocabulary meanings.
+function grammarEnglish(prompt,answer){
+ const texts=[grammarSpeech(prompt,answer),...[...prompt.matchAll(/“([^”]+)”/g)].map(match=>match[1])];
+ for(const text of texts.filter(Boolean)){
+  const english=GRAMMAR_EN[text]||WORDS.find(word=>word.de.toLowerCase()===text.toLowerCase())?.en;
+  if(english)return english;
+ }
+ return '';
 }
-// Some Chromium builds expose the API but never answer, so every step has a deadline.
-function withTimeout(promise,ms){return Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout')),ms))])}
-async function translate(text,onProgress){
- if(translations.has(text))return translations.get(text);
- translatorReady??=(async()=>{
-  const languages={sourceLanguage:'de',targetLanguage:'en'},availability=await withTimeout(window.Translator.availability(languages),5000);
-  if(availability==='unavailable')throw new Error('unavailable');
-  // A language pack download can take a while; it reports progress instead.
-  const created=window.Translator.create({...languages,monitor:m=>m.addEventListener('downloadprogress',event=>onProgress(event.loaded))});
-  return availability==='available'?withTimeout(created,10000):created;
- })().catch(error=>{translatorReady=null;translatorBroken=true;throw error});
- const english=await withTimeout((await translatorReady).translate(text),10000);
- translations.set(text,english);return english;
-}
-async function showTranslation(button){
- const text=button.dataset.translate,out=document.createElement('span');
- out.className='translation';out.lang='en';out.textContent='Translating…';button.replaceWith(out);
- try{out.textContent=await translate(text,loaded=>{out.textContent=`Downloading the translator… ${Math.round(loaded*100)}%`})}
- catch{out.innerHTML=`Translation unavailable here. <a href="${esc(googleTranslate(text))}" target="_blank" rel="noopener">Open Google Translate ↗</a>`}
-}
+function translationLine(english){return english?`<span class="translation" lang="en">${esc(english)}</span>`:''}
 function autoSpeak(text){if(state.sound)speak(text)}
 function updateSoundButton(){
  const button=$('#soundBtn');
@@ -195,7 +179,7 @@ ${card('Grammar',`<p>Each topic has a round of 20–80 exercises, practised in s
 ${card('Mistake retries',`<p>After a round, choose <strong>Practise mistakes again</strong> to retry only the items you missed. You can repeat this until you feel confident. Correct retries earn normal XP. Vocabulary retries count toward learning the word; grammar retries are extra practice and leave your topic assessment and saved place unchanged.</p>`)}
 ${card('Typing',`<p>Capitalization is flexible. You can type ä, ö, ü as ae, oe, ue and ß as ss. In vocabulary the article is optional; in grammar it counts.</p><p>In vocabulary, one slipped letter in a word of five or more letters still counts and shows the right spelling, unless it is in the last two letters or spells another word. Grammar answers must be exact.</p>`)}
 ${card('Keyboard',`<p><kbd>1</kbd>–<kbd>9</kbd> choose an answer · <kbd>Enter</kbd> continues. When building words, type letters and use <kbd>Backspace</kbd> to undo.</p>`)}
-${card('Translation',`<p>After a grammar answer, <b>EN</b> shows the sentence in English. Chrome translates on your device (the first use downloads a small language pack); other browsers open Google Translate in a new tab.</p>`)}
+${card('Translation',`<p>After every grammar answer, you see what the German means in English.</p>`)}
 ${card('Pronunciation',`<p>🔊 reads German aloud with your browser’s German voice. The button in the top bar turns automatic read-aloud after each answer on or off. Voice quality depends on your device.</p>`)}
 ${card('Streaks &amp; saving',`<p>Your streak counts consecutive days with at least one answer, by your device’s calendar. One missed day a week is forgiven if you practise the next day; missing more restarts it.</p><p>Guest progress stays on this device. Sign in to keep it in your account and use it on other devices.</p>`)}
 </div></section>`;
@@ -455,7 +439,7 @@ function answerFeedback(ok,value=''){
  const {answer:correct,prompt=''}=session.current,sentence=completedSentence(prompt,correct);
  const exact=ok&&session.current.kind==='type'&&value.trim()!==correct?`<br>Exact form: <strong lang="de">${esc(correct)}</strong>`:'';
  const spoken=grammarSpeech(prompt,correct);
- return (ok?'Well done.':'Correct answer: <strong lang="de">'+esc(correct)+'</strong>')+exact+(sentence?`<br>${sentence} ${speakButton(spoken)}${translateButton(spoken)}`:spoken?` ${speakButton(spoken)}${translateButton(spoken)}`:'')+(session.justPassed?`<br><strong>Rule passed: ${ruleStatus(session.rule.id).correct} of ${ruleStatus(session.rule.id).size} correct! +${XP_REWARDS.rulePassed} XP</strong>`:'');
+ return (ok?'Well done.':'Correct answer: <strong lang="de">'+esc(correct)+'</strong>')+exact+(sentence?`<br>${sentence} ${speakButton(spoken)}`:spoken?` ${speakButton(spoken)}`:'')+translationLine(grammarEnglish(prompt,correct))+(session.justPassed?`<br><strong>Rule passed: ${ruleStatus(session.rule.id).correct} of ${ruleStatus(session.rule.id).size} correct! +${XP_REWARDS.rulePassed} XP</strong>`:'');
 }
 function answer(value,button){
  if(session.locked)return;
@@ -480,7 +464,7 @@ function answer(value,button){
   session.roundAnswered=(session.roundAnswered||0)+1;
   if(!ok){
    const sentence=session.current.answer;
-   session.missed.push(`<span lang="de">${esc(sentence)}</span> ${speakButton(sentence)}${translateButton(sentence)}`);
+   session.missed.push(`<span lang="de">${esc(sentence)}</span> ${speakButton(sentence)}${translationLine(GRAMMAR_EN[sentence])}`);
    session.missedItems.push(session.items[session.index]);
   }
  }else{
@@ -497,7 +481,7 @@ function answer(value,button){
   $('#grammarProgress').innerHTML=grammarBar(ruleStatus(id));
   if(!ok){
    const {prompt='',answer:correct}=session.current,completed=completedSentence(prompt,correct),spoken=grammarSpeech(prompt,correct);
-   session.missed?.push(completed?`${completed} ${speakButton(spoken)}${translateButton(spoken)}`:`<span lang="de">${esc(prompt)}</span> → <strong lang="de">${esc(correct)}</strong>`);
+   session.missed?.push((completed?`${completed} ${speakButton(spoken)}`:`<span lang="de">${esc(prompt)}</span> → <strong lang="de">${esc(correct)}</strong>`)+translationLine(grammarEnglish(prompt,correct)));
    session.missedItems?.push(session.items[session.index]);
   }
  }
@@ -654,7 +638,7 @@ async function signOut(){
 function registerLearningTool(){const context=document.modelContext;if(!context?.registerTool)return;Promise.resolve(context.registerTool({name:'start_german_practice',title:'Start German practice',description:'Open a vocabulary round or a specific A1–A2 grammar rule in Wortwerk.',inputSchema:{type:'object',properties:{kind:{type:'string',enum:['words','grammar']},ruleId:{type:'string'}},required:['kind'],additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:false},execute(input){if(!ready)throw new Error('Wait until your account and progress have loaded.');if(!input||!['words','grammar'].includes(input.kind))throw new Error('kind must be words or grammar');if(input.kind==='words'){startWords();return{started:'words',questions:WORD_ROUND}}const rule=RULES.find(r=>r.id===input.ruleId);if(!rule)throw new Error('Provide a valid ruleId: '+RULES.map(r=>r.id).join(', '));startRule(rule.id);return{started:'grammar',ruleId:rule.id,title:rule.title,questions:rule.qs.length}}})).catch(()=>{});}
 document.querySelectorAll('.nav-item').forEach(b=>b.onclick=()=>go(b.dataset.view));$('#menuBtn').onclick=()=>$('.sidebar').classList.toggle('open');
 window.addEventListener('keydown',practiceKeys);
-window.addEventListener('click',event=>{const button=event.target?.closest?.('[data-speak]');if(button){event.preventDefault();speak(button.dataset.speak)}const translation=event.target?.closest?.('[data-translate]');if(translation){event.preventDefault();showTranslation(translation)}const link=event.target?.closest?.('[data-view-link]');if(link){event.preventDefault();go(link.dataset.viewLink)}});
+window.addEventListener('click',event=>{const button=event.target?.closest?.('[data-speak]');if(button){event.preventDefault();speak(button.dataset.speak)}const link=event.target?.closest?.('[data-view-link]');if(link){event.preventDefault();go(link.dataset.viewLink)}});
 $('#soundBtn').onclick=()=>{state.sound=!state.sound;save();if(state.sound)speak('Ton an')};
 if(speech){loadVoices();speech.addEventListener?.('voiceschanged',loadVoices)}
 window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue=''}});

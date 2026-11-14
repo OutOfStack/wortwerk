@@ -104,7 +104,7 @@
 .speech-toggle{margin-right:12px;min-width:44px}.speech-toggle[aria-pressed="false"]{opacity:.65}
 .no-speech .speak,.no-speech .speech-toggle{display:none}
 .rule.passed{background:#eef6ec;border-color:#a9cdaa;box-shadow:inset 4px 0 0 #5b8963}.passed-badge{color:#397148}
-.translate{display:inline-block;border:1px solid var(--line);background:transparent;color:var(--muted);padding:1px 7px;margin-left:4px;border-radius:999px;font-family:inherit;font-weight:700;font-size:12px;line-height:1.5;letter-spacing:.04em;vertical-align:middle;cursor:pointer;text-decoration:none}.translate:hover{background:var(--line);color:inherit}.translation{display:block;margin-top:4px;color:var(--muted);font-style:italic}.translation a{font-style:normal}
+.translation{display:block;margin-top:4px;color:var(--muted);font-style:italic}
 .rank-ladder small{color:var(--muted);font-weight:400;font-size:13px}
 
 /* Help page and inline links. */

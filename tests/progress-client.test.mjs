@@ -7,9 +7,10 @@ import * as levels from '../public/levels.js';
 import * as grammar from '../public/grammar-progress.js';
 import { RULES } from '../public/grammar.js';
 import { THEORY } from '../public/grammar-theory.js';
+import { GRAMMAR_EN } from '../public/grammar-translations.js';
 import { topicIcon } from '../public/topic-icons.js';
 
-const source = (await readFile('public/app.js', 'utf8')).replace(/^import .* from '\.\/(vocabulary|levels|grammar|grammar-progress|grammar-theory|topic-icons)\.js';\n/gm, '');
+const source = (await readFile('public/app.js', 'utf8')).replace(/^import .* from '\.\/(vocabulary|levels|grammar|grammar-progress|grammar-theory|grammar-translations|topic-icons)\.js';\n/gm, '');
 const empty = () => ({ xp: 0, xpVersion: 2, vocabularyVersion: VOCABULARY_VERSION, knownWordIds: [], answered: 0, correct: 0, wordMastery: {}, grammarVersion: 3, grammarProgress: {}, streak: 1, sound: true, activity: [0,0,0,0,0,0,0] });
 const user = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', email: 'alice@example.test' };
 const response = (body, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
@@ -214,7 +215,7 @@ function boot(fetch, guestProgress = { ...empty(), xp: 555 }, windowExtras = {})
   const storage = new Map([['wortwerk-progress', JSON.stringify({ ...empty(), xp: 99999 })], ['wortwerk-guest-progress', JSON.stringify(guestProgress)]]);
   const context = vm.createContext({
     structuredClone, setTimeout, clearTimeout, fetch,
-    ...levels, ...grammar, RULES, THEORY, topicIcon, VOCABULARY_VERSION,
+    ...levels, ...grammar, RULES, THEORY, GRAMMAR_EN, topicIcon, VOCABULARY_VERSION,
     document: { querySelector: s => { if (!elements.has(s)) elements.set(s, element()); return elements.get(s); }, querySelectorAll: () => [], createElement: element },
     localStorage: { getItem: k => storage.get(k), setItem: (k, v) => storage.set(k, v) },
     window: { addEventListener() {}, ...windowExtras }, location: { assign() {} },
@@ -610,51 +611,18 @@ test('separable verbs use two gaps so the infinitive cue cannot reveal the prefi
   assert.equal(app.evaluate("canType(['Ich ___ morgen ___. (ankommen)','komme … an',['ankomme … —']])"), false);
 });
 
-test('grammar feedback offers an English translation on request', async () => {
-  const plain = boot(async () => response({ user: null }));
+test('every grammar exercise shows its English meaning after the answer', async () => {
+  const app = boot(async () => response({ user: null }));
   await settle();
-  assert.equal(plain.evaluate("translateButton('')"), '', 'isolated forms get no translation');
-  assert.match(plain.evaluate("translateButton('Du kommst heute mit.')"), /href="https:\/\/translate\.google\.com\/\?sl=de&amp;tl=en&amp;op=translate&amp;text=Du%20kommst%20heute%20mit\."/, 'browsers without a translator link to Google Translate');
-  plain.evaluate("session={type:'grammar',rule:RULES.find(r=>r.id==='separable'),current:{kind:'choice',prompt:'Du ___ heute ___. (mitkommen)',answer:'kommst … mit'}}");
-  assert.match(plain.evaluate('answerFeedback(true)'), /class="translate"/);
-
-  let created = 0, fail = false;
-  let availability = 'available';
-  const Translator = { availability: async () => availability, create: async ({ sourceLanguage, targetLanguage }) => {
-    created++;
-    if (fail) throw new Error('unavailable');
-    return { translate: async text => `[${sourceLanguage}→${targetLanguage}] ${text}` };
-  } };
-  const app = boot(async () => response({ user: null }), empty(), { Translator });
-  await settle();
-  const button = text => { const shown = {}; return { shown, dataset: { translate: text }, replaceWith: out => { shown.out = out; } }; };
-  assert.match(app.evaluate("translateButton('Ich bin hier.')"), /<button[^>]+data-translate="Ich bin hier\."[^>]*>EN<\/button>/);
-  const first = button('Ich bin hier.');
-  await app.evaluate('showTranslation')(first);
-  assert.equal(first.shown.out.textContent, '[de→en] Ich bin hier.');
-  const again = button('Ich bin hier.');
-  await app.evaluate('showTranslation')(again);
-  const other = button('Du bist da.');
-  await app.evaluate('showTranslation')(other);
-  assert.equal(created, 1, 'one translator is reused and results are cached');
-  assert.equal(other.shown.out.textContent, '[de→en] Du bist da.');
-
-  const broken = boot(async () => response({ user: null }), empty(), { Translator });
-  await settle();
-  fail = true;
-  const failed = button('Wir sind hier.');
-  await broken.evaluate('showTranslation')(failed);
-  assert.match(failed.shown.out.innerHTML, /Open Google Translate/, 'a failed download falls back to the link');
-  assert.match(broken.evaluate("translateButton('Wir sind hier.')"), /translate\.google\.com/, 'later sentences go straight to the link');
-
-  const unsupported = boot(async () => response({ user: null }), empty(), { Translator });
-  await settle();
-  availability = 'unavailable';
-  const before = created;
-  const skipped = button('Ihr seid hier.');
-  await unsupported.evaluate('showTranslation')(skipped);
-  assert.match(skipped.shown.out.innerHTML, /Open Google Translate/);
-  assert.equal(created, before, 'no download is attempted for an unsupported language pair');
+  const english = (prompt, answer) => app.evaluate(`grammarEnglish(${JSON.stringify(prompt)},${JSON.stringify(answer)})`);
+  const missing = RULES.flatMap(rule => [...rule.qs, ...rule.extra].filter(([prompt, answer]) => !english(prompt, answer)).map(([prompt]) => `${rule.id}: ${prompt}`));
+  assert.deepEqual(missing, []);
+  assert.equal(english('Ich ___ neu in dieser Stadt.', 'bin'), 'I am new in this city.');
+  assert.equal(english('Choose the superlative with “am” of “groß”.', 'am größten'), 'big', 'single words use vocabulary meanings');
+  app.evaluate("session={type:'grammar',rule:RULES.find(r=>r.id==='sein'),current:{kind:'choice',prompt:'Ich ___ neu in dieser Stadt.',answer:'bin'}}");
+  const feedback = app.evaluate('answerFeedback(true)');
+  assert.match(feedback, /<span class="translation" lang="en">I am new in this city\.<\/span>/);
+  assert.doesNotMatch(feedback, /translate\.google|data-translate/);
 });
 
 test('guided practice starts above stats with new A1 words and the exact advertised selection', async () => {
