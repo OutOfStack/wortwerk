@@ -6,9 +6,9 @@ Wortwerk is a German A1–A2 practice app using React, Vinext/Vite, and Cloudfla
 
 - `app/`: page shells, sign-in UI, and API route adapters.
 - `lib/`: authentication, password hashing, and validated progress persistence.
-- `public/`: imperative practice UI (`app.js`), shared vocabulary (`vocabulary.js`), styles, and favicon.
+- `public/`: imperative practice UI (`app.js`), vocabulary (`vocabulary.js`), grammar exercises, theory and translations (`grammar*.js`), XP and ranks (`levels.js`), topic icons, styles, web manifest and icons. The server imports `vocabulary.js`, `levels.js`, `grammar-progress.js` and `grammar-config.js` to validate progress, so they must stay dependency-free ES modules.
 - `db/schema.ts` and `drizzle/`: Drizzle schema and ordered SQL migrations.
-- `tests/`: authentication integration tests, client regression tests, and fixtures.
+- `tests/`: authentication integration tests, client regression tests, grammar and level tests, and fixtures.
 - `scripts/`: local Worker tooling and deployment automation.
 
 ## Build, Test, and Development Commands
@@ -26,11 +26,11 @@ Use Node.js 22.13+ and pnpm 11.25.0.
 
 ## Coding Style & Naming Conventions
 
-Use two-space indentation, semicolons, and ES modules. Match surrounding quote style; existing files use both styles. Use camelCase for functions and variables, PascalCase for React components and types, and descriptive kebab-case filenames. Keep framework filenames such as `page.tsx` and `route.ts`. Use `@/` for root-relative TypeScript imports. ESLint uses Next.js Core Web Vitals and TypeScript configurations; no standalone formatter is configured.
+Use semicolons and ES modules. Match the surrounding style: TypeScript and most modules use two-space indentation, while `public/app.js` uses compact one-space, often single-line code. Existing files use both quote styles. Use camelCase for functions and variables, PascalCase for React components and types, and descriptive kebab-case filenames. Keep framework filenames such as `page.tsx` and `route.ts`. Use `@/` for root-relative TypeScript imports. ESLint uses Next.js Core Web Vitals and TypeScript configurations; no standalone formatter is configured.
 
 ## Testing Guidelines
 
-Name tests `tests/*.test.mjs` and use `node:test` with strict assertions. Authentication tests run Workers and D1 through Miniflare. Add regression coverage for changed authentication, account isolation, progress revisions, or vocabulary behavior. No numeric coverage threshold is configured. Run tests, typecheck, lint, and build before submitting; check visible changes on mobile and desktop.
+Name tests `tests/*.test.mjs` and use `node:test` with strict assertions. Authentication tests run Workers and D1 through Miniflare. Add regression coverage for changed authentication, account isolation, progress revisions, vocabulary, grammar progress, or XP and level behavior. No numeric coverage threshold is configured. Run tests, typecheck, lint, and build before submitting; check visible changes on mobile and desktop.
 
 ## Commit & Pull Request Guidelines
 
@@ -40,4 +40,4 @@ History uses imperative, descriptive subjects such as “Fix duplicate D1 bindin
 
 ## Data & Configuration Safety
 
-Vocabulary IDs are permanent progress keys: never renumber or reuse them. Declare the `DB` binding only in `wrangler.jsonc`. Add migrations instead of rewriting applied ones. Never commit credentials or log passwords, cookies, or tokens.
+Vocabulary IDs and grammar rule IDs are permanent progress keys: never renumber, rename or reuse them. When the saved progress shape changes, bump `XP_VERSION`, `VOCABULARY_VERSION` or `GRAMMAR_VERSION`, add an upgrade path, and keep accepting the older version in `lib/progress.ts`. Declare the `DB` binding only in `wrangler.jsonc`. Add migrations instead of rewriting applied ones. Never commit credentials or log passwords, cookies, or tokens.

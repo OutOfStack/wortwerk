@@ -6,22 +6,26 @@ An early German A1–A2 practice app with English instructions.
 
 - German → English and English → German multiple-choice vocabulary exercises.
 - English → German typed recall, letter-building and noun-article (der/die/das) exercises.
-- 1,194 vocabulary entries across 28 topics and 24 grammar topics with 20–80 exercises per round,
-  drawn from a bank of 2,599 grammar exercises.
+- 1,583 vocabulary entries across 28 topics and 25 grammar topics with 20–80 exercises per round,
+  drawn from a bank of 2,698 grammar exercises.
 - Randomized multiple-choice answers use the same part of speech, preferring the same topic and level.
 - Vocabulary rounds have 10 words.
-- Per-word progress: six correct answers retire a word from normal practice.
+- Per-word progress: six correct answers learn a word; spaced typed checks bring it back after
+  3, 7 and 21 days, then every 60 days.
+- Match pairs: boards of five German–English pairs from words already met.
+- Word order: build whole sentences from shuffled words.
 - “I know this” hides a word without awarding XP; restore it under Progress → Words marked known.
-- Vocabulary accepts optional articles, capitalization and alternative umlaut spellings.
+- Vocabulary accepts optional articles, capitalization, ae/oe/ue/ss spellings and one slipped
+  letter in longer words.
 - Grammar completion at a topic-specific rolling target of at least 87.5%, with saved exercise positions.
 - Grammar theory, translated examples, tables and common mistakes.
-- XP-based levels (1 XP chosen, 2 XP typed) with 27 ranks named after materials, Holz 1 → Diamant 3, capped at 474,743 XP.
+- XP-based levels (1 XP chosen, 2 XP typed, bonuses for learning a word and passing a topic) with 27 ranks named after materials, Holz 1 → Diamant 3, capped at 474,743 XP.
 - A Help page explaining scoring, XP, levels, shortcuts, pronunciation and streaks.
 - Email/password registration, sign-in, sign-out and account-specific progress in Cloudflare D1.
 - Grammar answers by choosing or typing; feedback shows the completed sentence.
 - Keyboard shortcuts: 1–9 answer, Enter continues, typed letters and Backspace
   in letter-building. Letter tiles also have Undo and Clear.
-- Guided practice above the homepage stats revisits up to four practised words, then adds new A1 words before A2.
+- Guided practice above the homepage stats starts with up to five due spaced checks, then mixes practised words with new A1 words before A2.
 - End-of-round review and targeted retry of missed words and sentences. Grammar retries earn XP without changing assessment history or the saved exercise position.
 - Vocabulary topics with single-colour Lucide icons (ISC licence, `public/topic-icons.js`).
 - Daily streak (one missed day a week is forgiven) and a last-7-days chart based on local calendar days.
@@ -29,7 +33,7 @@ An early German A1–A2 practice app with English instructions.
 - A responsive interface for phones and desktops; answer feedback stays in view.
 
 - Pronunciation through the browser's built-in speech synthesis (German voice).
-- English translation of grammar sentences on request, after answering.
+- English translation of every grammar exercise, shown after answering.
 
 This is a prototype, not a complete A1/A2 curriculum.
 
@@ -51,22 +55,22 @@ no speech synthesis or lists voices but none in German.
 
 ## Translation
 
-After a grammar answer, a small **EN** button next to the completed sentence
-shows it in English. It appears only after answering, so the translation cannot
-hint at the answer. Chrome 138+ on desktop translates on the device with the
-built-in [Translator API](https://developer.chrome.com/docs/ai/translator-api)
-(the first use downloads a de→en language pack); results are cached for the
-session. Other browsers get an **EN ↗** link that opens Google Translate in a new
-tab, as does Chrome if the language pack cannot be downloaded. Nothing is sent
-anywhere until the learner asks.
+After a grammar answer, the feedback shows the completed sentence in English.
+It appears only after answering, so the translation cannot hint at the answer.
+Translations are bundled in `public/grammar-translations.js`; single-word items
+(articles, plurals, comparatives, participles) use the vocabulary meaning.
+Nothing is sent to a translation service.
 
 ## XP and practice ranks
 
 A correct answer earns **1 XP** when it is chosen from options or built from
 given letters, and **2 XP** when it is typed (vocabulary recall or grammar in
-Type mode). Wrong answers and “I know this” earn nothing. A word retires after
-six correct answers, two of which are typed, so a new word earns up to
-8 XP. `XP_VERSION` stays at 2: stored totals are not changed, and old open tabs
+Type mode). A typed vocabulary answer with one slipped letter earns 1 XP.
+Learning a word adds a **5 XP** bonus and passing a grammar topic **20 XP**.
+Wrong answers and “I know this” earn nothing. A word is learned after six correct
+answers, two of which are typed, so a new word earns up to 13 XP including the
+bonus; each spaced check earns up to 2 XP more. Match pairs and word order earn
+XP without changing word or topic progress. `XP_VERSION` stays at 2: stored totals are not changed, and old open tabs
 simply keep awarding 1 XP until they reload.
 
 Level 1 starts at 0 XP. Reaching Level 2 takes 30 XP; each subsequent step costs
@@ -79,9 +83,11 @@ The 27 ranks are nine materials — Holz, Stein, Kupfer, Bronze, Eisen, Silber,
 Gold, Platin, Diamant — with three steps each, shown with their English meaning
 on the Progress page.
 
-With the current content, learning every word (1,194 × 11 = 13,134 XP) plus one
-perfect grammar round of every topic (1,500 XP choosing, up to 2,804 XP typing)
-reaches Level 16 (Silber 1). Grammar topics can be repeated for further XP.
+With the current content, learning every word (1,583 × 13 = 20,579 XP) plus one
+perfect grammar round of every topic with its pass bonus (2,048 XP choosing, up to
+3,380 XP typing) reaches Level 17 (Silber 2) or Level 18 (Silber 3). Passing every
+word's 3-, 7- and 21-day checks adds up to 9,498 XP, reaching Level 19 (Gold 1).
+Grammar topics, match pairs and word order can be repeated for further XP.
 
 The Help page (sidebar → Help) explains XP, levels, scoring, typing rules,
 keyboard shortcuts, pronunciation, streaks and saving, so practice screens stay
@@ -95,9 +101,10 @@ are preserved. Old open tabs must reload before saving under the new XP rules.
 
 ## Vocabulary coverage and known words
 
-The catalog contains 1,194 independently curated everyday entries, including noun
-articles, English meanings, topics and parts of speech. The original 295 IDs are
-unchanged, and IDs 1000–1193 were appended. Topics include education, technology,
+The catalog contains 1,583 independently curated everyday entries (731 A1, 852 A2),
+including noun articles, English meanings, topics and parts of speech, aligned with
+the Goethe A1/A2 word lists. IDs 0–999 are the earlier catalog; later entries are
+appended from 1000 (currently up to 1582). Topics include education, technology,
 nature, colors, numbers (cardinal and ordinal), pronouns, prepositions, animals, feelings, question
 words and services (post office and authorities). A1/A2 tags are learning guidance, not an official
 word-by-word exam classification or a corpus frequency ranking.
@@ -108,22 +115,29 @@ This catalog is a practice foundation, not the complete official exam list.
 The [A2 exam](https://www.goethe.de/ins/de/en/prf/prf/gzsd2.html) also assesses
 listening, reading, writing and speaking.
 
-“I know this” is available in all three vocabulary exercise modes. It excludes
+“I know this” is available in every vocabulary exercise. It excludes
 the word from future practice, saves immediately, and does not change XP, correct
 answer counts, accuracy or activity. Skipped words are excluded from round
 accuracy. Progress → Words marked known lets you restore a word with its earlier
 practice count intact. Guest exclusions remain on the device; signed-in exclusions
 belong to the account and sync through D1.
 
-`vocabularyVersion: 1` prevents older open tabs from overwriting the new
-`knownWordIds` field. Existing progress loads with an empty exclusion list. The
-progress request limit is 64 KiB to accommodate all 1,194 word records, known IDs,
-all grammar histories and the activity log together (about 40 KiB at most).
+`vocabularyVersion` prevents older open tabs from overwriting newer fields:
+version 1 added `knownWordIds`, version 2 adds spaced checks (`wordReviews`).
+Existing progress loads with an empty exclusion list and no scheduled checks. The
+progress request limit is 128 KiB to accommodate all word records, spaced checks,
+known IDs, all grammar histories and the activity log together.
 
 Each word cycles through its six correct answers as: German → English choice,
-typed recall, letter building, English → German choice, typed recall, and article
-choice for nouns (letter building otherwise). Counts saved under the earlier
-eight-answer target are read as at most six, so those words count as learned.
+English → German choice, letter building, typed recall, typed recall, and article
+choice for nouns (letter building otherwise), so typing waits until the fourth
+answer. Counts saved under the earlier eight-answer target are read as at most six,
+so those words count as learned.
+
+Learned words return as typed spaced checks after 3, 7 and 21 days, then every
+60 days. A miss brings the check back the next day; passing the 21-day check
+counts the word as known. Guided practice starts with up to five due checks,
+oldest first.
 
 ## Streaks and activity
 
@@ -161,7 +175,7 @@ cues because the German infinitive equals the wir / sie form.
 Topics include verb conjugation, causal clauses, plural forms, indefinite articles,
 personal and possessive pronouns, nominative, demonstratives, prepositions, local
 prepositions, W-questions, local adverbs, separable and reflexive verbs,
-Partizip II, and countable/uncountable nouns. Komparativ and Superlativ remain
+Partizip II, countable/uncountable nouns and the imperative. Komparativ and Superlativ remain
 a combined topic. The Partizip II topic focuses on formation alongside the
 existing Perfekt topic. Existing conjugation and weil/dass rules keep their
 progress IDs rather than creating duplicate rules.
@@ -171,8 +185,12 @@ das Mädchen…); later article rounds draw from every other A1 noun in the
 vocabulary as well.
 
 Broad topics have 80 exercises per round for repeated practice across forms and
-contexts; narrower topics keep 20–40 exercises. Each topic’s window equals its
+contexts; narrower topics keep 20–48 exercises. Each topic’s window equals its
 round size.
+
+Word order practice builds whole sentences from shuffled words, drawn from A1
+topics and any topic already started. It earns XP and leaves topic scores
+unchanged.
 
 Exercises spread their vocabulary instead of repeating one sentence frame: the
 present-tense round uses about 60 different A1 verbs (each at most twice), modal
@@ -184,7 +202,7 @@ adds -t/-d and -s/-z spelling patterns (du arbeitest, du tanzt) to present tense
 
 The first round keeps the curated order. Later rounds draw a deterministic,
 shuffled selection of the same size from the curated exercises plus an extra
-bank (`public/grammar-extra.js`, 1,051 exercises with more people, nouns, verbs,
+bank (`public/grammar-extra.js`, 1,150 exercises with more people, nouns, verbs,
 questions and sentence patterns). The selection depends only on the topic and
 round number, so reloading resumes the same exercise. Window sizes, passing
 targets and saved histories are unchanged. The passing target is `ceil(count × 7 / 8)`:
@@ -195,6 +213,7 @@ targets and saved histories are unchanged. The passing target is `ceil(count × 
 | 24 | 21 |
 | 32 | 28 |
 | 40 | 35 |
+| 48 | 42 |
 | 80 | 70 |
 
 Complete a full window before passing. After the last exercise, continuing returns
@@ -351,18 +370,22 @@ and [CPU limits](https://developers.cloudflare.com/workers/platform/limits/#cpu-
 
 ## Source layout
 
-- `public/app.js`: curriculum, exercises and client progress handling.
+- `public/app.js`: practice UI, exercise flow, spaced checks and client progress handling.
 - `public/vocabulary.js`: shared vocabulary catalog with permanent word IDs and parts of speech.
 - `public/levels.js`: XP rewards, rank thresholds and legacy XP conversion.
-- `public/grammar.js`: 1,500 first-round grammar exercises across 24 topics.
-- `public/grammar-extra.js`: 1,051 further exercises mixed into later rounds.
+- `public/grammar.js`: the 1,548 first-round grammar exercises across 25 topics.
+- `public/grammar-extra.js`: 1,150 further exercises mixed into later rounds.
 - `public/grammar-config.js`: topic sizes and passing targets shared by client and server.
-- `public/grammar-more.js`: local adverbs, separable/reflexive verbs, participles and countability.
+- `public/grammar-more.js`: local adverbs, separable/reflexive verbs, participles, countability and the imperative.
 - `public/grammar-topics.js`: additional foundational topic exercises and explanations.
+- `public/grammar-options.js`: distractor generation for plural and separable-verb answers.
 - `public/grammar-theory.js`: the complete theory catalog.
+- `public/grammar-translations.js`: English translations of grammar sentences.
 - `public/grammar-progress.js`: rolling grammar scores, completion, migration and round selection.
+- `public/topic-icons.js`: Lucide topic icons.
 - `public/styles.css`: interface styles.
 - `app/page.tsx` and `app/sign-in/page.tsx`: app shell and account form.
+- `app/api/auth/[action]/route.ts`: register, login, logout and current-user endpoints.
 - `app/api/progress/route.ts`: authenticated progress endpoint.
 - `lib/auth.ts`, `lib/auth-handlers.ts`, `lib/password.ts`: independent authentication.
 - `lib/progress.ts`: validated, account-owned progress with revision checks.
@@ -382,6 +405,8 @@ distinct meanings fall back to typed recall.
 - Verify the complete production account/progress flow and monitor CPU usage.
 - Add email verification and password-reset delivery if required.
 - Expand and review the A1/A2 curriculum.
+
+Larger planned changes are listed in [`docs/BACKLOG.md`](docs/BACKLOG.md).
 
 No credentials, user progress data, installed dependencies or build output
 are included in this repository. Third-party notices are retained with their
