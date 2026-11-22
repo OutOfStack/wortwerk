@@ -1,4 +1,4 @@
-import type { Metadata, Viewport } from "next";
+import type { Metadata } from "next";
 import "./globals.css";
 import "../public/styles.css";
 
@@ -18,13 +18,17 @@ export const metadata: Metadata = {
   },
 };
 
-// Tints the mobile browser bar to match the page in each theme.
-export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f5f2ea" },
-    { media: "(prefers-color-scheme: dark)", color: "#0f1210" },
-  ],
-};
+// Runs in <head> before first paint so a saved theme never flashes the other one.
+// The #themeBtn click cycles auto → light → dark; "auto" follows the device setting live.
+// It owns the single theme-color meta, so the mobile browser bar matches the chosen theme.
+const themeScript = `(()=>{const key='wortwerk-theme',root=document.documentElement,mq=matchMedia('(prefers-color-scheme: dark)'),next={auto:'light',light:'dark',dark:'auto'},labels={auto:'Theme: match device',light:'Theme: light',dark:'Theme: dark'};
+let pref;try{pref=localStorage.getItem(key)}catch{}if(!next[pref])pref='auto';
+const meta=document.createElement('meta');meta.name='theme-color';document.head.appendChild(meta);
+const apply=()=>{const dark=pref==='dark'||(pref==='auto'&&mq.matches);root.dataset.theme=dark?'dark':'light';root.dataset.themePref=pref;
+meta.content=dark?'#0f1210':'#f5f2ea';
+const button=document.getElementById('themeBtn');if(button){button.setAttribute('aria-label',labels[pref]);button.title=labels[pref]}};
+apply();mq.addEventListener('change',apply);document.addEventListener('DOMContentLoaded',apply);
+document.addEventListener('click',e=>{if(!e.target.closest||!e.target.closest('#themeBtn'))return;pref=next[pref];try{localStorage.setItem(key,pref)}catch{}apply()})})();`;
 
 export default function RootLayout({
   children,
@@ -32,8 +36,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    // The theme script sets data-theme attributes on <html> before React hydrates.
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         {/* Fraunces headings and Inter body text; system fonts cover a failed load. */}

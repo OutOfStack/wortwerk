@@ -326,50 +326,56 @@ h2{font-weight:600;letter-spacing:-.015em}
   .feedback .primary{width:100%;min-height:52px}
 }
 
-/* Dark theme: follows the device setting. Light-mode colours above stay the source of truth. */
-@media(prefers-color-scheme:dark){
-:root{color-scheme:dark;--ink:#f1ede3;--paper:#0f1210;--card:#1a1f1b;--mint:#2c4a37;--accent-text:#f0936a;--good:#5fbf83;--muted:#a2aba4;--line:#2b322d;--soft:#262c27;--deep:#1e3427;--on-deep:#f3efe4;--shadow:0 10px 30px rgba(0,0,0,.35)}
-/* Ink is light here, so ink-filled controls become cream with dark text. */
-.primary,.filter.active,.input-toggle .filter.active{color:var(--paper)}
-.primary:hover{background:#d9d4c7}
-.brand span,.solution mark,.guided-practice .primary{color:#0f1210}
-.rule-start::after{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%230f1210'%3E%3Cpath d='M8 5.1v13.8a1 1 0 0 0 1.5.86l11-6.9a1 1 0 0 0 0-1.72l-11-6.9A1 1 0 0 0 8 5.1z'/%3E%3C/svg%3E")}
-.rule.passed .rule-start::after{background-color:#2c4a37;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23f1ede3'%3E%3Cpath d='M8 5.1v13.8a1 1 0 0 0 1.5.86l11-6.9a1 1 0 0 0 0-1.72l-11-6.9A1 1 0 0 0 8 5.1z'/%3E%3C/svg%3E")}
-.nav-item:hover,.nav-item.active,.plan-chips li{background:#2c4a37}
-.plan-chips li{color:#dce7df}
-.streak svg{color:#f0936a}
-.filters .filter{color:#b6beb7}
-.filters .filter.active{background:#3a423c;color:var(--ink);box-shadow:none}
-.input-toggle .filter.active{background:var(--ink);color:var(--paper)}
-.secondary,.type-row input{border-color:#3a423c}
-.type-row input,.letter,.auth-form input,kbd{background:var(--card);color:var(--ink)}
-.lesson-card:hover,.rule:has(.rule-start:hover){border-color:#4a534c}
-.lesson-card+.lesson-card{border-top-color:#242a25}
-.lesson-icon{background:#163323;color:#8fd3a8}
-.lesson-card:nth-child(4n+2) .lesson-icon{background:#3a3018;color:#efc75e}
-.lesson-card:nth-child(4n+3) .lesson-icon{background:#3d2419;color:#f2a27c}
-.lesson-card:nth-child(4n+4) .lesson-icon{background:#1b2b40;color:#8db8ee}
-.mastery-note,#syncStatus:not(:empty){background:#3a3018}
-.theory-table thead,.theory-note{background:#163323}
-.rule.passed{background:#132a1c;border-color:#2c4a37}
-.grammar-correct{--segment:#5fbf83}
-.grammar-unanswered{--segment:#2b322d}
-.choice,.match-tile{border-color:#343b36}
-.choice{box-shadow:0 2px 0 #343b36}
-.choice .key{background:#262c27;color:#b6beb7}
-.choice.correct,.match-tile.correct{background:#163323}
-.choice.wrong,.match-tile.wrong{background:#3d2419;border-color:#f0936a}
-.choice.wrong{box-shadow:0 2px 0 #f0936a}
-.feedback.good strong,.password-rules .met,.passed-badge,.g-das{color:#6fcb91}
-.feedback.bad strong{color:#f0936a}
-.g-der{color:#8db8ee}
-.g-die,.auth-form .auth-error{color:#f0918b}
-input:focus-visible,button:focus-visible,a:focus-visible,.rule-theory summary:focus-visible,.theory-table:focus-visible,.rank-ladder summary:focus-visible{outline-color:var(--sun)}
+/* Dark theme: the inline script in app/layout.tsx sets data-theme from the saved choice or the device setting.
+   :where() keeps these overrides at the same specificity as the light rules above. */
+:root[data-theme=dark]{color-scheme:dark;--ink:#f1ede3;--paper:#0f1210;--card:#1a1f1b;--mint:#2c4a37;--accent-text:#f0936a;--good:#5fbf83;--muted:#a2aba4;--line:#2b322d;--soft:#262c27;--deep:#1e3427;--on-deep:#f3efe4;--shadow:0 10px 30px rgba(0,0,0,.35)}
+:where([data-theme=dark]) .primary,:where([data-theme=dark]) .filter.active,:where([data-theme=dark]) .input-toggle .filter.active{color:var(--paper)}
+:where([data-theme=dark]) .primary:hover{background:#d9d4c7}
+:where([data-theme=dark]) .brand span,:where([data-theme=dark]) .solution mark,:where([data-theme=dark]) .guided-practice .primary{color:#0f1210}
+:where([data-theme=dark]) .rule-start::after{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%230f1210'%3E%3Cpath d='M8 5.1v13.8a1 1 0 0 0 1.5.86l11-6.9a1 1 0 0 0 0-1.72l-11-6.9A1 1 0 0 0 8 5.1z'/%3E%3C/svg%3E")}
+:where([data-theme=dark]) .rule.passed .rule-start::after{background-color:#2c4a37;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23f1ede3'%3E%3Cpath d='M8 5.1v13.8a1 1 0 0 0 1.5.86l11-6.9a1 1 0 0 0 0-1.72l-11-6.9A1 1 0 0 0 8 5.1z'/%3E%3C/svg%3E")}
+:where([data-theme=dark]) .nav-item:hover,:where([data-theme=dark]) .nav-item.active,:where([data-theme=dark]) .plan-chips li{background:#2c4a37}
+:where([data-theme=dark]) .plan-chips li{color:#dce7df}
+:where([data-theme=dark]) .streak svg{color:#f0936a}
+:where([data-theme=dark]) .filters .filter{color:#b6beb7}
+:where([data-theme=dark]) .filters .filter.active{background:#3a423c;color:var(--ink);box-shadow:none}
+:where([data-theme=dark]) .input-toggle .filter.active{background:var(--ink);color:var(--paper)}
+:where([data-theme=dark]) .secondary,:where([data-theme=dark]) .type-row input{border-color:#3a423c}
+:where([data-theme=dark]) .type-row input,:where([data-theme=dark]) .letter,:where([data-theme=dark]) .auth-form input,:where([data-theme=dark]) kbd{background:var(--card);color:var(--ink)}
+:where([data-theme=dark]) .lesson-card:hover,:where([data-theme=dark]) .rule:has(.rule-start:hover){border-color:#4a534c}
+:where([data-theme=dark]) .lesson-card+.lesson-card{border-top-color:#242a25}
+:where([data-theme=dark]) .lesson-icon{background:#163323;color:#8fd3a8}
+:where([data-theme=dark]) .lesson-card:nth-child(4n+2) .lesson-icon{background:#3a3018;color:#efc75e}
+:where([data-theme=dark]) .lesson-card:nth-child(4n+3) .lesson-icon{background:#3d2419;color:#f2a27c}
+:where([data-theme=dark]) .lesson-card:nth-child(4n+4) .lesson-icon{background:#1b2b40;color:#8db8ee}
+:where([data-theme=dark]) .mastery-note,:where([data-theme=dark]) #syncStatus:not(:empty){background:#3a3018}
+:where([data-theme=dark]) .theory-table thead,:where([data-theme=dark]) .theory-note{background:#163323}
+:where([data-theme=dark]) .rule.passed{background:#132a1c;border-color:#2c4a37}
+:where([data-theme=dark]) .grammar-correct{--segment:#5fbf83}
+:where([data-theme=dark]) .grammar-unanswered{--segment:#2b322d}
+:where([data-theme=dark]) .choice,:where([data-theme=dark]) .match-tile{border-color:#343b36}
+:where([data-theme=dark]) .choice{box-shadow:0 2px 0 #343b36}
+:where([data-theme=dark]) .choice .key{background:#262c27;color:#b6beb7}
+:where([data-theme=dark]) .choice.correct,:where([data-theme=dark]) .match-tile.correct{background:#163323}
+:where([data-theme=dark]) .choice.wrong,:where([data-theme=dark]) .match-tile.wrong{background:#3d2419;border-color:#f0936a}
+:where([data-theme=dark]) .choice.wrong{box-shadow:0 2px 0 #f0936a}
+:where([data-theme=dark]) .feedback.good strong,:where([data-theme=dark]) .password-rules .met,:where([data-theme=dark]) .passed-badge,:where([data-theme=dark]) .g-das{color:#6fcb91}
+:where([data-theme=dark]) .feedback.bad strong{color:#f0936a}
+:where([data-theme=dark]) .g-der{color:#8db8ee}
+:where([data-theme=dark]) .g-die,:where([data-theme=dark]) .auth-form .auth-error{color:#f0918b}
+:where([data-theme=dark]) input:focus-visible,:where([data-theme=dark]) button:focus-visible,:where([data-theme=dark]) a:focus-visible,:where([data-theme=dark]) .rule-theory summary:focus-visible,:where([data-theme=dark]) .theory-table:focus-visible,:where([data-theme=dark]) .rank-ladder summary:focus-visible{outline-color:var(--sun)}
+@media(max-width:760px){
+:where([data-theme=dark]) .sidebar{background:rgba(26,31,27,.96)}
+:where([data-theme=dark]) .nav-item:hover,:where([data-theme=dark]) .nav-item.active{background:transparent}
+:where([data-theme=dark]) .nav-item.active .nav-icon{background:#3a3422}
+:where([data-theme=dark]) .feedback.good:not(.hidden){background:#163323}
+:where([data-theme=dark]) .feedback.bad:not(.hidden){background:#3d2419}
 }
-@media(prefers-color-scheme:dark) and (max-width:760px){
-.sidebar{background:rgba(26,31,27,.96)}
-.nav-item:hover,.nav-item.active{background:transparent}
-.nav-item.active .nav-icon{background:#3a3422}
-.feedback.good:not(.hidden){background:#163323}
-.feedback.bad:not(.hidden){background:#3d2419}
-}
+
+/* Theme button cycles auto → light → dark; the icon shows the saved choice. */
+.theme-toggle{display:inline-grid;place-items:center;width:44px;height:44px;flex-shrink:0;padding:0;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);cursor:pointer}
+.theme-toggle svg{display:none;width:19px;height:19px}
+:root:not([data-theme-pref]) .theme-auto,[data-theme-pref=auto] .theme-auto,[data-theme-pref=light] .theme-light,[data-theme-pref=dark] .theme-dark{display:block}
+@media(max-width:760px){.theme-toggle{width:40px;height:40px}}
+/* 320px phones: tighten the top bar so the logo keeps its size next to the theme button. */
+@media(max-width:359px){.topbar{gap:4px;padding:0 8px 0 12px}.topbar-brand span{flex-shrink:0}.streak{padding:0 9px}.topbar .sound-toggle{padding:8px 9px}}
