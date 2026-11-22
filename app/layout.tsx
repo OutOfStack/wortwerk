@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "../public/styles.css";
 
@@ -16,6 +16,14 @@ export const metadata: Metadata = {
     shortcut: "/favicon-wortwerk.svg",
     apple: { url: "/apple-touch-icon.png", sizes: "180x180" },
   },
+};
+
+// Tints the mobile browser bar to match the page in each theme.
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f5f2ea" },
+    { media: "(prefers-color-scheme: dark)", color: "#0f1210" },
+  ],
 };
 
 export default function RootLayout({
